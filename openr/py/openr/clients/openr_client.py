@@ -99,7 +99,7 @@ def get_openr_ctrl_client(
     options override please look at openr.cli.utils.options.OPTIONS
     """
 
-    options = options if options else getDefaultOptions(host)
+    options = options or getDefaultOptions(host)
     if options.ssl:
         return OpenrCtrlSecureClient(
             host,
@@ -130,7 +130,7 @@ def get_openr_ctrl_cpp_client(
     Major Usecase for: py3 supports streaming
     """
 
-    options = options if options else getDefaultOptions(host)
+    options = options or getDefaultOptions(host)
     ssl_context = None
     # Create ssl context if specified
     if options.ssl:

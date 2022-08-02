@@ -64,10 +64,9 @@ def to_thrift_prefix_type(prefix_type: str) -> network_types.PrefixType:
     PREFIX_TYPE_TO_VALUES = network_types.PrefixType._NAMES_TO_VALUES
     if prefix_type.upper() not in PREFIX_TYPE_TO_VALUES:
         raise Exception(
-            "Unknown type {}. Use any of {}".format(
-                prefix_type, ", ".join(PREFIX_TYPE_TO_VALUES.keys())
-            )
+            f'Unknown type {prefix_type}. Use any of {", ".join(PREFIX_TYPE_TO_VALUES.keys())}'
         )
+
 
     return PREFIX_TYPE_TO_VALUES[prefix_type.upper()]
 
@@ -76,10 +75,9 @@ def to_thrift_forwarding_type(forwarding_type: str) -> PrefixForwardingType:
     FORWARDING_TYPE_TO_VALUES = PrefixForwardingType._NAMES_TO_VALUES
     if forwarding_type not in FORWARDING_TYPE_TO_VALUES:
         raise Exception(
-            "Unknown forwarding type {}. Use any of {}".format(
-                forwarding_type, ", ".join(FORWARDING_TYPE_TO_VALUES.keys())
-            )
+            f'Unknown forwarding type {forwarding_type}. Use any of {", ".join(FORWARDING_TYPE_TO_VALUES.keys())}'
         )
+
     return FORWARDING_TYPE_TO_VALUES[forwarding_type]
 
 
@@ -234,25 +232,24 @@ class OriginatedRoutesCmd(PrefixMgrCmd):
                                         FABRIC_POD_CLUSTER_PRIVATE_SUBAGG (if tag_to_name is providied)
 
         """
-        rows.append(
-            "Acronyms: SR - Supporting Routes Count | MSR - Min Supporting Routes\n"
-            "          I  - Install_to_fib/Installed"
+        rows.extend(
+            (
+                "Acronyms: SR - Supporting Routes Count | MSR - Min Supporting Routes\n"
+                "          I  - Install_to_fib/Installed",
+                "",
+                f"{'Prefix':<36} "
+                f"{'Community':>15} "
+                f"{'SR':>6} "
+                f"{'MSR':>6} "
+                f"{'I':>6} ",
+                "",
+            )
         )
-        rows.append("")
 
-        rows.append(
-            f"{'Prefix':<36} "
-            f"{'Community':>15} "
-            f"{'SR':>6} "
-            f"{'MSR':>6} "
-            f"{'I':>6} "
-        )
-        rows.append("")
         tag_to_name = tag_to_name if tag_to_name is not None else {}
         for prefix_entry in originated_prefixes:
             tag: List[str] = [""]
-            prefix_tags = prefix_entry.prefix.tags
-            if prefix_tags:
+            if prefix_tags := prefix_entry.prefix.tags:
                 tag = [tag_to_name.get(t, t) for t in prefix_tags]
 
             installed: bool = False
@@ -266,8 +263,7 @@ class OriginatedRoutesCmd(PrefixMgrCmd):
                 f"{prefix_entry.prefix.minimum_supporting_routes:>6} {'':3}"
                 f"{prefix_entry.prefix.install_to_fib:>1}/{installed:<1}"
             )
-            for index in range(1, len(tag)):
-                rows.append(f"{'':37}{str(tag[index]):>15} ")
+            rows.extend(f"{'':37}{str(tag[index]):>15} " for index in range(1, len(tag)))
 
     def _print_orig_routes_detailed(
         self,
@@ -299,21 +295,18 @@ class OriginatedRoutesCmd(PrefixMgrCmd):
                 prefix_entry.prefix.forwardingType
             )
             rows.append(
-                # pyre-fixme[58]: `+` is not supported for operand types `str` and
-                #  `Optional[str]`.
-                f"     Forwarding - algorithm: {fwd_algo:>7} {'Type: ' + fwd_type:>23}"
+                f"     Forwarding - algorithm: {fwd_algo:>7} {f'Type: {fwd_type}':>23}"
             )
+
             rows.append(
                 f"     Metrics - path-preference: {prefix_entry.prefix.path_preference}"
                 f", source-preference: {prefix_entry.prefix.source_preference}"
             )
-            prefix_tags = prefix_entry.prefix.tags
-            if prefix_tags:
+            if prefix_tags := prefix_entry.prefix.tags:
                 rows.append(
                     f"     Tags - {', '.join([tag_to_name.get(t,t) for t in prefix_tags])}"
                 )
-            area_stack = prefix_entry.prefix.area_stack
-            if area_stack:
+            if area_stack := prefix_entry.prefix.area_stack:
                 rows.append(f"     Area Stack - {', '.join(area_stack)}")
             if prefix_entry.prefix.minNexthop:
                 rows.append(f"     Min-nexthops: {prefix_entry.prefix.minNexthop}")
@@ -323,9 +316,9 @@ class OriginatedRoutesCmd(PrefixMgrCmd):
             )
             if prefix_entry.prefix.install_to_fib:
                 rows.append(
-                    f"     install_to_fib: {prefix_entry.prefix.install_to_fib}"
-                    f" {'Installed: ' + str(prefix_entry.installed):>34}"
+                    f"     install_to_fib: {prefix_entry.prefix.install_to_fib} {f'Installed: {str(prefix_entry.installed)}':>34}"
                 )
+
 
             rows.append("")
 

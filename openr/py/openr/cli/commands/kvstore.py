@@ -86,7 +86,7 @@ class KvStoreCmdBase(OpenrCtrlCmd):
                         "{}\n{}{}".format(
                             title,
                             pub_update,
-                            "\n\n{}".format(sprint_db) if sprint_db else "",
+                            f"\n\n{sprint_db}" if sprint_db else "",
                         )
                     ]
                 ],
@@ -122,7 +122,6 @@ class KvStoreCmdBase(OpenrCtrlCmd):
     ) -> Dict:
         """get the dict of all nodes to their IP in the network"""
 
-        node_dict = {}
         keyDumpParams = self.buildKvStoreKeyDumpParams(Consts.PREFIX_DB_MARKER)
         resp = kvstore_types.Publication()
         if not self.area_feature:
@@ -134,10 +133,10 @@ class KvStoreCmdBase(OpenrCtrlCmd):
             resp = client.getKvStoreKeyValsFilteredArea(keyDumpParams, area)
 
         prefix_maps = utils.collate_prefix_keys(resp.keyVals)
-        for node, prefix_db in prefix_maps.items():
-            node_dict[node] = self.get_node_ip(prefix_db)
-
-        return node_dict
+        return {
+            node: self.get_node_ip(prefix_db)
+            for node, prefix_db in prefix_maps.items()
+        }
 
     def get_node_ip(self, prefix_db: openr_types.PrefixDatabase) -> Any:
         """get routable IP address of node from it's prefix database"""
@@ -147,19 +146,20 @@ class KvStoreCmdBase(OpenrCtrlCmd):
             if prefix_entry.type == network_types.PrefixType.LOOPBACK:
                 return ipnetwork.sprint_addr(prefix_entry.prefix.prefixAddress.addr)
 
-        # Next look for PREFIX_ALLOCATOR prefix if any
-        for prefix_entry in prefix_db.prefixEntries:
-            if prefix_entry.type == network_types.PrefixType.PREFIX_ALLOCATOR:
-                return utils.alloc_prefix_to_loopback_ip_str(prefix_entry.prefix)
-
-        # Else return None
-        return None
+        return next(
+            (
+                utils.alloc_prefix_to_loopback_ip_str(prefix_entry.prefix)
+                for prefix_entry in prefix_db.prefixEntries
+                if prefix_entry.type == network_types.PrefixType.PREFIX_ALLOCATOR
+            ),
+            None,
+        )
 
     def get_area_id(self) -> str:
         if not self.area_feature:
             print("Try to call get_area_id() without enabling area feature.")
             sys.exit(1)
-        if 1 != len(self.areas):
+        if len(self.areas) != 1:
             print(f"Error: Must specify one of the areas: {self.areas}")
             sys.exit(1)
         (area,) = self.areas
@@ -191,8 +191,8 @@ class KvPrefixesCmd(KvStoreCmdBase):
     ):
         all_kv = kvstore_types.Publication()
         all_kv.keyVals = {}
-        for _, val in resp.items():
-            all_kv.keyVals.update(val.keyVals)
+        for val in resp.values():
+            all_kv.keyVals |= val.keyVals
         if json:
             utils.print_prefixes_json(
                 all_kv, nodes, prefix, client_type, self.iter_publication
@@ -250,16 +250,14 @@ class KvKeysCmd(KvStoreCmdBase):
         # Export in json format if enabled
         if json:
             all_kv = {}
-            for _, kv in resp.items():
-                all_kv.update(kv.keyVals)
+            for kv in resp.values():
+                all_kv |= kv.keyVals
 
             # Force set value to None
             for value in all_kv.values():
                 value.value = None
 
-            data = {}
-            for k, v in all_kv.items():
-                data[k] = utils.thrift_to_dict(v)
+            data = {k: utils.thrift_to_dict(v) for k, v in all_kv.items()}
             print(utils.json_dumps(data))
             return
 
@@ -301,7 +299,7 @@ class KvKeysCmd(KvStoreCmdBase):
         caption = f"KvStore Data - {num_keys} keys, {db_bytes_str}"
         column_labels = ["Key", "Originator", "Ver", "Hash", "Size", "Area"]
         if ttl:
-            column_labels = column_labels + ["TTL - Ver"]
+            column_labels += ["TTL - Ver"]
 
         print(printing.render_horizontal_table(rows, column_labels, caption))
 
@@ -353,7 +351,7 @@ class KvKeyValsCmd(KvStoreCmdBase):
         }
 
         prefix_type = key.split(":")[0] + ":"
-        if prefix_type in options.keys():
+        if prefix_type in options:
             return serializer.deserialize_thrift_object(
                 value.value, options[prefix_type]
             )
@@ -381,17 +379,10 @@ class KvKeyValsCmd(KvStoreCmdBase):
             ttl = "INF" if value.ttl == Consts.CONST_TTL_INF else value.ttl
             rows.append(
                 [
-                    "key: {}\n  version: {}\n  originatorId: {}\n  "
-                    "ttl: {}\n  ttlVersion: {}\n  value:\n    {}".format(
-                        key,
-                        value.version,
-                        value.originatorId,
-                        ttl,
-                        value.ttlVersion,
-                        val,
-                    )
+                    f"key: {key}\n  version: {value.version}\n  originatorId: {value.originatorId}\n  ttl: {ttl}\n  ttlVersion: {value.ttlVersion}\n  value:\n    {val}"
                 ]
             )
+
 
         area = f"in area {area}" if area is not None else ""
         caption = f"Dump key-value pairs in KvStore {area}"
@@ -644,10 +635,12 @@ class KvCompareCmd(KvStoreCmdBase):
 
             keyDumpParams = self.buildKvStoreKeyDumpParams(Consts.ALL_DB_MARKER)
             pub = None
-            if not self.area_feature:
-                pub = client.getKvStoreKeyValsFiltered(keyDumpParams)
-            else:
-                pub = client.getKvStoreKeyValsFilteredArea(keyDumpParams, area)
+            pub = (
+                client.getKvStoreKeyValsFilteredArea(keyDumpParams, area)
+                if self.area_feature
+                else client.getKvStoreKeyValsFiltered(keyDumpParams)
+            )
+
             kv_dict = self.dump_nodes_kvs(nodes, all_nodes_to_ips, area)
             for node in kv_dict:
                 self.compare(pub.keyVals, kv_dict[node], host_id, node)
@@ -662,16 +655,13 @@ class KvCompareCmd(KvStoreCmdBase):
     def compare(self, our_kvs, other_kvs, our_node, other_node):
         """print kv delta"""
 
-        print(
-            printing.caption_fmt(
-                "kv-compare between {} and {}".format(our_node, other_node)
-            )
-        )
+        print(printing.caption_fmt(f"kv-compare between {our_node} and {other_node}"))
 
         # for comparing version and id info
-        our_kv_pub_db = {}
-        for key, value in our_kvs.items():
-            our_kv_pub_db[key] = (value.version, value.originatorId)
+        our_kv_pub_db = {
+            key: (value.version, value.originatorId)
+            for key, value in our_kvs.items()
+        }
 
         for key, value in sorted(our_kvs.items()):
             other_val = other_kvs.get(key, None)
@@ -718,7 +708,7 @@ class KvCompareCmd(KvStoreCmdBase):
 
         if lines != []:
             self.print_publication_delta(
-                "Key: {} difference".format(key),
+                f"Key: {key} difference",
                 utils.sprint_pub_update(our_kv_pub_db, key, other_val),
                 "\n".join(lines) if lines else "",
             )
@@ -728,7 +718,7 @@ class KvCompareCmd(KvStoreCmdBase):
 
         print(
             printing.render_vertical_table(
-                [["key: {} only in {} kv store".format(key, node)]]
+                [[f"key: {key} only in {node} kv store"]]
             )
         )
 
@@ -743,7 +733,7 @@ class KvCompareCmd(KvStoreCmdBase):
             kv = utils.dump_node_kvs(self.cli_opts, node_ip, area)
             if kv is not None:
                 kv_dict[node] = kv.keyVals
-                print("dumped kv from {}".format(node))
+                print(f"dumped kv from {node}")
         return kv_dict
 
 
@@ -761,14 +751,13 @@ class KvPeersCmd(KvStoreCmdBase):
         """print the Kv Store peers"""
 
         host_id = client.getMyNodeName()
-        caption = "{}'s peers".format(host_id)
+        caption = f"{host_id}'s peers"
 
         rows = []
         for area, peers in peers_list.items():
             area = area if area is not None else "N/A"
             for (key, value) in sorted(peers.items(), key=lambda x: x[0]):
-                row = [f"{key}, area:{area}"]
-                row.append("cmd via {}".format(value.cmdUrl))
+                row = [f"{key}, area:{area}", f"cmd via {value.cmdUrl}"]
                 rows.append(row)
 
         print(printing.render_vertical_table(rows, caption=caption))
@@ -784,9 +773,7 @@ class PeersCmd(KvPeersCmd):
         if not self.area_feature:
             super()._run(client)
             return
-        peers_list = {}
-        for area in self.areas:
-            peers_list[area] = client.getKvStorePeersArea(area)
+        peers_list = {area: client.getKvStorePeersArea(area) for area in self.areas}
         self.print_peers(client, peers_list)
 
 
@@ -803,7 +790,7 @@ class EraseKeyCmd(KvStoreCmdBase):
         keyVals = publication.keyVals
 
         if key not in keyVals:
-            print("Error: Key {} not found in KvStore.".format(key))
+            print(f"Error: Key {key} not found in KvStore.")
             sys.exit(1)
 
         # Get and modify the key
@@ -822,7 +809,7 @@ class EraseKeyCmd(KvStoreCmdBase):
 
         client.setKvStoreKeyVals(kvstore_types.KeySetParams(keyVals), area)
 
-        print("Success: key {} will be erased soon from all KvStores.".format(key))
+        print(f"Success: key {key} will be erased soon from all KvStores.")
 
 
 class SetKeyCmd(KvStoreCmdBase):
@@ -851,9 +838,9 @@ class SetKeyCmd(KvStoreCmdBase):
                 existing_val = publication.keyVals.get(key)
                 curr_version = getattr(existing_val, "version", 0)
                 print(
-                    "Key {} found in KvStore w/ version {}. Overwriting with"
-                    " higher version ...".format(key, curr_version)
+                    f"Key {key} found in KvStore w/ version {curr_version}. Overwriting with higher version ..."
                 )
+
                 version = curr_version + 1
             else:
                 version = 1
@@ -868,13 +855,7 @@ class SetKeyCmd(KvStoreCmdBase):
         keyVals = {key: val}
         client.setKvStoreKeyVals(kvstore_types.KeySetParams(keyVals), area)
         print(
-            "Success: Set key {} with version {} and ttl {} successfully"
-            " in KvStore. This does not guarantee that value is updated"
-            " in KvStore as old value can be persisted back".format(
-                key,
-                val.version,
-                val.ttl if val.ttl != Consts.CONST_TTL_INF else "infinity",
-            )
+            f'Success: Set key {key} with version {val.version} and ttl {val.ttl if val.ttl != Consts.CONST_TTL_INF else "infinity"} successfully in KvStore. This does not guarantee that value is updated in KvStore as old value can be persisted back'
         )
 
 
@@ -898,7 +879,7 @@ class KvSignatureCmd(KvStoreCmdBase):
         for _, value in sorted(resp.keyVals.items(), key=lambda x: x[0]):
             signature.update(str(value.hash).encode("utf-8"))
 
-        print("sha256: {}".format(signature.hexdigest()))
+        print(f"sha256: {signature.hexdigest()}")
 
 
 class SnoopCmd(KvStoreCmdBase):
@@ -959,11 +940,7 @@ class SnoopCmd(KvStoreCmdBase):
 
         start_time = time.time()
         awaited_updates = None
-        while True:
-            # Break if it is time
-            if duration > 0 and time.time() - start_time > duration:
-                break
-
+        while not (duration > 0 and time.time() - start_time > duration):
             # Await for an update
             if not awaited_updates:
                 awaited_updates = [updates.__anext__()]
@@ -982,10 +959,10 @@ class SnoopCmd(KvStoreCmdBase):
     def print_expired_keys(self, msg: kvstore_types.Publication, global_dbs: Dict):
         rows = []
         if len(msg.expiredKeys):
-            print("Traversal List: {}".format(msg.nodeIds))
+            print(f"Traversal List: {msg.nodeIds}")
 
         for key in msg.expiredKeys:
-            rows.append(["Key: {} got expired".format(key)])
+            rows.append([f"Key: {key} got expired"])
 
             # Delete key from global DBs
             global_dbs["publications"].pop(key, None)
@@ -993,16 +970,11 @@ class SnoopCmd(KvStoreCmdBase):
                 global_dbs["adjs"].pop(key.split(":")[1], None)
 
             if key.startswith(Consts.PREFIX_DB_MARKER):
-                prefix_match = re.match(Consts.PER_PREFIX_KEY_REGEX, key)
-                # in case of per prefix key expire, the prefix DB entry does not
-                # contain any prefixes. The prefix must be constructed from the
-                # key. Update the prefix set of the corresponding node.
-                if prefix_match:
-                    prefix_set = set()
-                    addr_str = prefix_match.group("ipaddr")
-                    prefix_len = prefix_match.group("plen")
-                    prefix_set.add("{}/{}".format(addr_str, prefix_len))
-                    node_prefix_set = global_dbs["prefixes"][prefix_match.group("node")]
+                if prefix_match := re.match(Consts.PER_PREFIX_KEY_REGEX, key):
+                    addr_str = prefix_match["ipaddr"]
+                    prefix_len = prefix_match["plen"]
+                    prefix_set = {f"{addr_str}/{prefix_len}"}
+                    node_prefix_set = global_dbs["prefixes"][prefix_match["node"]]
                     node_prefix_set = node_prefix_set - prefix_set
                 else:
                     global_dbs["prefixes"].pop(key.split(":")[1], None)
@@ -1019,7 +991,7 @@ class SnoopCmd(KvStoreCmdBase):
 
         for key, value in msg.keyVals.items():
             if value.value is None:
-                print("Traversal List: {}".format(msg.nodeIds))
+                print(f"Traversal List: {msg.nodeIds}")
                 self.print_publication_delta(
                     f"Key: {key}, ttl update",
                     [f"ttl: {value.ttl}, ttlVersion: {value.ttlVersion}"],
@@ -1047,9 +1019,9 @@ class SnoopCmd(KvStoreCmdBase):
                 )
                 continue
 
-            print("Traversal List: {}".format(msg.nodeIds))
+            print(f"Traversal List: {msg.nodeIds}")
             self.print_publication_delta(
-                "Key: {} update".format(key),
+                f"Key: {key} update",
                 utils.sprint_pub_update(global_dbs["publications"], key, value),
                 timestamp=True,
             )
@@ -1075,11 +1047,12 @@ class SnoopCmd(KvStoreCmdBase):
 
         if lines:
             self.print_publication_delta(
-                "{}'s prefixes".format(prefix_db.thisNodeName),
+                f"{prefix_db.thisNodeName}'s prefixes",
                 utils.sprint_pub_update(global_publication_db, key, value),
                 lines,
                 timestamp=True,
             )
+
 
         utils.update_global_prefix_db(global_prefix_db, prefix_db, key)
 
@@ -1097,9 +1070,11 @@ class SnoopCmd(KvStoreCmdBase):
         if delta:
             old_adj_db = global_adj_db.get(new_adj_db.thisNodeName, None)
             if old_adj_db is None:
-                lines = "ADJ_DB_ADDED: {}\n".format(
-                    new_adj_db.thisNodeName
-                ) + utils.sprint_adj_db_full(global_adj_db, new_adj_db, False)
+                lines = (
+                    f"ADJ_DB_ADDED: {new_adj_db.thisNodeName}\n"
+                    + utils.sprint_adj_db_full(global_adj_db, new_adj_db, False)
+                )
+
             else:
                 lines = utils.sprint_adj_db_delta(new_adj_db, old_adj_db)
                 lines = "\n".join(lines)
@@ -1108,11 +1083,12 @@ class SnoopCmd(KvStoreCmdBase):
 
         if lines:
             self.print_publication_delta(
-                "{}'s adjacencies".format(new_adj_db.thisNodeName),
+                f"{new_adj_db.thisNodeName}'s adjacencies",
                 utils.sprint_pub_update(global_publication_db, key, value),
                 lines,
                 timestamp=True,
             )
+
 
         utils.update_global_adj_db(global_adj_db, new_adj_db)
 
@@ -1224,10 +1200,9 @@ class AllocationsSetCmd(SetKeyCmd):
         prefix = ipnetwork.ip_str_to_prefix(prefix_str)
         if allocs.nodePrefixes.get(node_name) == prefix:
             print(
-                "No changes needed. {}'s prefix is already set to {}".format(
-                    node_name, prefix_str
-                )
+                f"No changes needed. {node_name}'s prefix is already set to {prefix_str}"
             )
+
             return
 
         # Update value in KvStore
@@ -1273,7 +1248,7 @@ class AllocationsUnsetCmd(SetKeyCmd):
 
         # Return if there need no change
         if node_name not in allocs.nodePrefixes:
-            print("No changes needed. {}'s prefix is not set".format(node_name))
+            print(f"No changes needed. {node_name}'s prefix is not set")
             return
 
         # Update value in KvStore
@@ -1287,11 +1262,11 @@ class AllocationsUnsetCmd(SetKeyCmd):
 
 class SummaryCmd(KvStoreCmdBase):
     def _get_summary_stats_template(self, area: str = "") -> List[Dict[str, Any]]:
-        if area != "":
-            title = " Stats for Area " + area
-            area = "." + area
-        else:
+        if not area:
             title = "Global Summary Stats"
+        else:
+            title = f" Stats for Area {area}"
+            area = f".{area}"
         return [
             {
                 "title": title,
@@ -1311,11 +1286,11 @@ class SummaryCmd(KvStoreCmdBase):
 
     def _get_area_str(self) -> str:
         s = "s" if len(self.areas) != 1 else ""
-        return f", {str(len(self.areas))} configured area{s}"
+        return f", {len(self.areas)} configured area{s}"
 
     def _get_bytes_str(self, bytes_count: int) -> str:
         if bytes_count < 1024:
-            return "{} Bytes".format(bytes_count)
+            return f"{bytes_count} Bytes"
         elif bytes_count < 1024 * 1024:
             return "{:.2f}KB".format(bytes_count / 1024)
         else:
@@ -1342,7 +1317,7 @@ class SummaryCmd(KvStoreCmdBase):
         self, summaries: List[kvstore_types.KvStoreAreaSummary]
     ) -> kvstore_types.KvStoreAreaSummary:
         global_summary = kvstore_types.KvStoreAreaSummary()
-        global_summary.area = "ALL" + self._get_area_str()
+        global_summary.area = f"ALL{self._get_area_str()}"
         # peersMap's type: Dict[str, kvstore_types.PeerSpec]
         global_summary.peersMap = {}
         # create a map of unique total peers for this node
@@ -1369,7 +1344,7 @@ class SummaryCmd(KvStoreCmdBase):
     ) -> None:
         allFlag: bool = False
         # if no area(s) filter specified in CLI, then get all configured areas
-        if len(input_areas) == 0:
+        if not input_areas:
             input_areas = set(self.areas)
             allFlag = True
 
@@ -1433,13 +1408,12 @@ class StreamSummaryCmd(KvStoreCmdBase):
             uptime = uptime_str.split(".")[0]
             last_msg_time = last_msg_time_str
 
-        row = [
+        return [
             stream_session_info.subscriber_id,
             uptime,
             stream_session_info.total_streamed_msgs,
             last_msg_time,
         ]
-        return row
 
     def run(self, *args, **kwargs) -> int:
         async def _wrapper() -> int:

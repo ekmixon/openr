@@ -18,12 +18,9 @@ from openr.utils import printing
 
 class MonitorCmd(OpenrCtrlCmd):
     def print_log_list_type(self, llist: List) -> str:
-        idx = 1
         str_txt = "{}".format("".join(llist[0]) + "\n")
-        while idx < len(llist):
+        for idx in range(1, len(llist)):
             str_txt += "{:<18} {}".format("", "".join(llist[idx]) + "\n")
-            idx += 1
-
         return str_txt
 
     def print_log_sample(self, log_sample: Dict) -> None:
@@ -59,13 +56,13 @@ class CountersCmd(MonitorCmd):
         """print the Kv Store counters"""
 
         host_id = client.getMyNodeName()
-        caption = "{}'s counters".format(host_id)
+        caption = f"{host_id}'s counters"
 
-        rows = []
-        for key, counter in sorted(resp.items()):
-            if not key.startswith(prefix):
-                continue
-            rows.append([key, ":", counter])
+        rows = [
+            [key, ":", counter]
+            for key, counter in sorted(resp.items())
+            if key.startswith(prefix)
+        ]
 
         if json:
             json_data = {k: v for k, _, v in rows}
@@ -92,19 +89,13 @@ class LogCmd(MonitorCmd):
             self.print_log_data(resp, json_opt)
         except TypeError:
             host_id = client.getMyNodeName()
-            print(
-                "Incompatible return type. Please upgrade Open/R binary on {}".format(
-                    host_id
-                )
-            )
+            print(f"Incompatible return type. Please upgrade Open/R binary on {host_id}")
 
     def print_log_data(self, resp, json_opt):
         """print the log data"""
 
         if json_opt:
-            event_logs = []
-            for event_log in resp:
-                event_logs.append(json.loads(event_log))
+            event_logs = [json.loads(event_log) for event_log in resp]
             print(utils.json_dumps(event_logs))
 
         else:

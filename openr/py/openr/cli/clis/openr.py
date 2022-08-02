@@ -32,7 +32,7 @@ class OpenrCli:
 
     @click.group()
     @click.pass_context
-    def openr(ctx: click.Context) -> None:  # noqa: B902
+    def openr(self) -> None:    # noqa: B902
         """CLI tool to peek into Openr information."""
         pass
 
@@ -41,9 +41,9 @@ class VersionCli:
     @click.command()
     @click.option("--json/--no-json", default=False, help="Dump in JSON format")
     @click.pass_obj
-    def version(cli_opts: Bunch, json: bool) -> None:  # noqa: B902
+    def version(self, json: bool) -> None:    # noqa: B902
         """
         Get OpenR version
         """
 
-        openr.VersionCmd(cli_opts).run(json)
+        openr.VersionCmd(self).run(json)

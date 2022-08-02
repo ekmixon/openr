@@ -28,14 +28,14 @@ class UtilsTests(unittest.TestCase):
         weight=1,  # : int
         otherIfName="",  # : str
     ):  # -> openr_types.Adjacency
-        adj = openr_types.Adjacency(
+        return openr_types.Adjacency(
             otherNodeName=otherNodeName,
             ifName=ifName,
             metric=metric,
             adjLabel=adjLabel,
             isOverloaded=isOverloaded,
             rtt=rtt,
-            timestamp=(timestamp if timestamp else int(time.time())),
+            timestamp=timestamp or int(time.time()),
             weight=weight,
             otherIfName=otherIfName,
             nextHopV6=network_types.BinaryAddress(
@@ -43,7 +43,6 @@ class UtilsTests(unittest.TestCase):
             ),
             nextHopV4=network_types.BinaryAddress(addr=b"\x00\x00\x00\x00"),
         )
-        return adj
 
     def test_find_adj_list_deltas(self):
         adjs_old = [

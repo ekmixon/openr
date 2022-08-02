@@ -17,7 +17,7 @@ class TechSupportCli(object):
         "--routes", is_flag=True, default=True, help="Show routes in techsupport output"
     )
     @click.pass_context
-    def tech_support(ctx, fib_agent_port, routes):  # noqa: B902
+    def tech_support(self, fib_agent_port, routes):    # noqa: B902
         """Extensive logging of Open/R's state for debugging"""
 
         """
@@ -26,4 +26,4 @@ class TechSupportCli(object):
         - Recent perf events
         """
 
-        TechSupportCmd(ctx.obj).run(routes)
+        TechSupportCmd(self.obj).run(routes)

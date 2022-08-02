@@ -31,17 +31,15 @@ class LMCmdBase(OpenrCtrlCmd):
         print()
 
         if overload and links.isOverloaded:
-            print("Node {} is already overloaded.\n".format(host))
+            print(f"Node {host} is already overloaded.\n")
             sys.exit(0)
 
         if not overload and not links.isOverloaded:
-            print("Node {} is not overloaded.\n".format(host))
+            print(f"Node {host} is not overloaded.\n")
             sys.exit(0)
 
         action = "set overload bit" if overload else "unset overload bit"
-        if not utils.yesno(
-            "Are you sure to {} for node {} ?".format(action, host), yes
-        ):
+        if not utils.yesno(f"Are you sure to {action} for node {host} ?", yes):
             print()
             return
 
@@ -50,7 +48,7 @@ class LMCmdBase(OpenrCtrlCmd):
         else:
             client.unsetNodeOverload()
 
-        print("Successfully {}..\n".format(action))
+        print(f"Successfully {action}..\n")
 
     def toggle_link_overload_bit(
         self,
@@ -63,7 +61,7 @@ class LMCmdBase(OpenrCtrlCmd):
         print()
 
         if interface not in links.interfaceDetails:
-            print("No such interface: {}".format(interface))
+            print(f"No such interface: {interface}")
             return
 
         if overload and links.interfaceDetails[interface].isOverloaded:
@@ -85,7 +83,7 @@ class LMCmdBase(OpenrCtrlCmd):
         else:
             client.unsetInterfaceOverload(interface)
 
-        print("Successfully {} for the interface.\n".format(action))
+        print(f"Successfully {action} for the interface.\n")
 
     def check_link_overriden(
         self, links: openr_types.DumpLinksReply, interface: str, metric: int
@@ -96,9 +94,7 @@ class LMCmdBase(OpenrCtrlCmd):
         2) metricOverride set -> return True/False;
         """
         metricOverride = links.interfaceDetails[interface].metricOverride
-        if not metricOverride:
-            return None
-        return metricOverride == metric
+        return metricOverride == metric if metricOverride else None
 
     def toggle_link_metric(
         self,
@@ -112,7 +108,7 @@ class LMCmdBase(OpenrCtrlCmd):
         print()
 
         if interface not in links.interfaceDetails:
-            print("No such interface: {}".format(interface))
+            print(f"No such interface: {interface}")
             return
 
         status = self.check_link_overriden(links, interface, metric)
@@ -121,11 +117,7 @@ class LMCmdBase(OpenrCtrlCmd):
             sys.exit(0)
 
         if override and status:
-            print(
-                "Interface: {} has already been set with metric: {}.\n".format(
-                    interface, metric
-                )
-            )
+            print(f"Interface: {interface} has already been set with metric: {metric}.\n")
             sys.exit(0)
 
         action = "set override metric" if override else "unset override metric"
@@ -139,7 +131,7 @@ class LMCmdBase(OpenrCtrlCmd):
         else:
             client.unsetInterfaceMetric(interface)
 
-        print("Successfully {} for the interface.\n".format(action))
+        print(f"Successfully {action} for the interface.\n")
 
 
 class SetNodeOverloadCmd(LMCmdBase):
@@ -286,16 +278,14 @@ class LMLinksCmd(LMCmdBase):
             if utils.is_color_output_supported():
                 overload_color = "red" if links.isOverloaded else "green"
                 overload_status = click.style(
-                    "{}".format("YES" if links.isOverloaded else "NO"),
-                    fg=overload_color,
+                    f'{"YES" if links.isOverloaded else "NO"}', fg=overload_color
                 )
-                caption = "Node Overload: {}".format(overload_status)
-                self.print_links_table(links.interfaceDetails, caption)
+
+                caption = f"Node Overload: {overload_status}"
             else:
-                caption = "Node Overload: {}".format(
-                    "YES" if links.isOverloaded else "NO"
-                )
-                self.print_links_table(links.interfaceDetails, caption)
+                caption = f'Node Overload: {"YES" if links.isOverloaded else "NO"}'
+
+            self.print_links_table(links.interfaceDetails, caption)
 
     def interface_info_to_dict(self, interface_info):
         def _update(interface_info_dict, interface_info):
@@ -345,27 +335,22 @@ class LMLinksCmd(LMCmdBase):
             addrs = raw_row[3]
             raw_row[3] = ""
             rows.append(raw_row)
-            for addrStr in addrs:
-                rows.append(["", "", "", addrStr])
+            rows.extend(["", "", "", addrStr] for addrStr in addrs)
         return rows
 
     @staticmethod
     def build_table_row(k: str, v: object) -> List[Any]:
         # pyre-fixme[16]: `object` has no attribute `metricOverride`.
-        metric_override = v.metricOverride if v.metricOverride else ""
+        metric_override = v.metricOverride or ""
         # pyre-fixme[16]: `object` has no attribute `info`.
         if v.info.isUp:
-            backoff_sec = int(
-                # pyre-fixme[16]: `object` has no attribute `linkFlapBackOffMs`.
-                (v.linkFlapBackOffMs if v.linkFlapBackOffMs else 0)
-                / 1000
-            )
+            backoff_sec = int(((v.linkFlapBackOffMs or 0) / 1000))
             if backoff_sec == 0:
                 state = "Up"
             elif not utils.is_color_output_supported():
                 state = backoff_sec
             else:
-                state = click.style("Hold ({} s)".format(backoff_sec), fg="yellow")
+                state = click.style(f"Hold ({backoff_sec} s)", fg="yellow")
         else:
             state = (
                 click.style("Down", fg="red")
@@ -383,8 +368,7 @@ class LMLinksCmd(LMCmdBase):
         for prefix in v.info.networks:
             addrStr = ipnetwork.sprint_addr(prefix.prefixAddress.addr)
             addrs.append(addrStr)
-        row = [k, state, metric_override, addrs]
-        return row
+        return [k, state, metric_override, addrs]
 
     @classmethod
     def print_links_table(cls, interfaces, caption=None):

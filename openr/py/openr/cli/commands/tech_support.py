@@ -73,7 +73,7 @@ class TechSupportCmd(object):
         sys.exit(ret)
 
     def print_title(self, title):
-        print("\n--------  {}  --------\n".format(title))
+        print(f"\n--------  {title}  --------\n")
 
     def print_config_file(self):
         if not os.path.isfile(Consts.OPENR_CONFIG_FILE):

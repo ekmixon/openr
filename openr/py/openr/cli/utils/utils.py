@@ -69,7 +69,7 @@ def yesno(question, skip_confirm=False):
 
     while True:
         try:
-            prompt = "{} [yn] ".format(question)
+            prompt = f"{question} [yn] "
             answer = input(prompt).lower()
         except EOFError:
             with open("/dev/tty") as sys.stdin:
@@ -188,20 +188,24 @@ def sprint_prefixes_db_full(prefix_db, loopback_only=False):
         sorted(prefix_db.prefixEntries, key=lambda x: x.prefix.prefixLength),
         key=lambda x: x.prefix.prefixAddress.addr,
     )
-    for prefix_entry in sorted_entries:
-        if loopback_only and prefix_entry.type is not network_types.PrefixType.LOOPBACK:
-            continue
-        prefix_strs.append(
-            [
-                ipnetwork.sprint_prefix(prefix_entry.prefix),
-                ipnetwork.sprint_prefix_type(prefix_entry.type),
-                ipnetwork.sprint_prefix_forwarding_type(prefix_entry.forwardingType),
-                ipnetwork.sprint_prefix_forwarding_algorithm(
-                    prefix_entry.forwardingAlgorithm
-                ),
-                str(prefix_entry.prependLabel) if prefix_entry.prependLabel else "",
-            ]
-        )
+    prefix_strs.extend(
+        [
+            ipnetwork.sprint_prefix(prefix_entry.prefix),
+            ipnetwork.sprint_prefix_type(prefix_entry.type),
+            ipnetwork.sprint_prefix_forwarding_type(
+                prefix_entry.forwardingType
+            ),
+            ipnetwork.sprint_prefix_forwarding_algorithm(
+                prefix_entry.forwardingAlgorithm
+            ),
+            str(prefix_entry.prependLabel)
+            if prefix_entry.prependLabel
+            else "",
+        ]
+        for prefix_entry in sorted_entries
+        if not loopback_only
+        or prefix_entry.type is network_types.PrefixType.LOOPBACK
+    )
 
     return printing.render_horizontal_table(
         prefix_strs,
@@ -250,9 +254,8 @@ def parse_prefix_database(
                     f"Unknown client type. Use one of {list(_TYPES.keys())}"
                 )
 
-    if prefix_filter:
-        if isinstance(prefix_filter, str):
-            prefix_filter = ipnetwork.ip_str_to_prefix(prefix_filter)
+    if prefix_filter and isinstance(prefix_filter, str):
+        prefix_filter = ipnetwork.ip_str_to_prefix(prefix_filter)
 
     if isinstance(prefix_db, kv_store_types.Value):
         prefix_db = deserialize_thrift_object(
@@ -280,13 +283,15 @@ def parse_prefix_database(
 def print_prefixes_table(resp, nodes, prefix, client_type, iter_func):
     """print prefixes"""
 
-    rows = []
     prefix_maps = {}
     iter_func(
         prefix_maps, resp, nodes, partial(parse_prefix_database, prefix, client_type)
     )
-    for node_name, prefix_db in prefix_maps.items():
-        rows.append(["{}".format(node_name), sprint_prefixes_db_full(prefix_db)])
+    rows = [
+        [f"{node_name}", sprint_prefixes_db_full(prefix_db)]
+        for node_name, prefix_db in prefix_maps.items()
+    ]
+
     print(printing.render_vertical_table(rows))
 
 
@@ -358,12 +363,13 @@ def prefix_entry_to_dict(prefix_entry):
                 if prefix_entry.data is not None
                 else None,
                 "metrics": thrift_to_dict(prefix_entry.metrics),
-                "tags": list(prefix_entry.tags if prefix_entry.tags else []),
+                "tags": list(prefix_entry.tags or []),
                 "mv": metric_vector_to_dict(prefix_entry.mv)
                 if prefix_entry.mv
                 else None,
             }
         )
+
 
     return thrift_to_dict(prefix_entry, _update)
 
@@ -637,20 +643,16 @@ def print_adjs_table(adjs_map, neigh=None, interface=None):
 
         # report adjacency version
         if "version" in val:
-            adj_tokens.append("Version: {}".format(val["version"]))
+            adj_tokens.append(f'Version: {val["version"]}')
 
-        # report overloaded only when it is overloaded
-        is_overloaded = val["overloaded"]
-        if is_overloaded:
-            overload_str = "{}".format(is_overloaded)
+        if is_overloaded := val["overloaded"]:
+            overload_str = f"{is_overloaded}"
             if is_color_output_supported():
                 overload_str = click.style(overload_str, fg="red")
-            adj_tokens.append("Overloaded: {}".format(overload_str))
+            adj_tokens.append(f"Overloaded: {overload_str}")
 
-        # report node label if non zero
-        node_label = val["node_label"]
-        if node_label:
-            adj_tokens.append("Node Label: {}".format(node_label))
+        if node_label := val["node_label"]:
+            adj_tokens.append(f"Node Label: {node_label}")
 
         # horizontal adj table for a node
         rows = []
@@ -692,11 +694,11 @@ def print_adjs_table(adjs_map, neigh=None, interface=None):
             seg = printing.render_horizontal_table(
                 rows, column_labels, tablefmt="plain"
             )
-        cap = "{} {} {}".format(node, "=>" if adj_tokens else "", ", ".join(adj_tokens))
+        cap = f'{node} {"=>" if adj_tokens else ""} {", ".join(adj_tokens)}'
         output.append([cap, seg])
 
     if neigh is not None and interface is not None and not adj_found:
-        print("Adjacency with {} {} is not formed.".format(neigh, interface))
+        print(f"Adjacency with {neigh} {interface} is not formed.")
         return
 
     print(printing.render_vertical_table(output))
@@ -721,7 +723,7 @@ def sprint_adj_db_full(global_adj_db, adj_db, bidir):
     overload_str = click.style(
         f"{adj_db.isOverloaded}", fg="red" if adj_db.isOverloaded else None
     )
-    title_tokens.append("Overloaded: {}".format(overload_str))
+    title_tokens.append(f"Overloaded: {overload_str}")
     if adj_db.nodeLabel:
         title_tokens.append(f"Node Label: {adj_db.nodeLabel}")
 
@@ -821,11 +823,12 @@ def route_db_to_dict(route_db: openr_types.RouteDatabase) -> Dict[str, Any]:
     Convert route from thrift instance into a dict in strings
     """
 
-    ret = {
-        "unicastRoutes": [unicast_route_to_dict(r) for r in route_db.unicastRoutes],
+    return {
+        "unicastRoutes": [
+            unicast_route_to_dict(r) for r in route_db.unicastRoutes
+        ],
         "mplsRoutes": [mpls_route_to_dict(r) for r in route_db.mplsRoutes],
     }
-    return ret
 
 
 def print_routes_json(
@@ -838,32 +841,26 @@ def print_routes_json(
     filter
     """
 
-    networks = None
-    if prefixes:
-        networks = [ipaddress.ip_network(p) for p in prefixes]
-
+    networks = [ipaddress.ip_network(p) for p in prefixes] if prefixes else None
     # Filter out all routes based on prefixes and labels
     for routes in route_db_dict.values():
         if "unicastRoutes" in routes:
-            filtered_unicast_routes = []
-            for route in routes["unicastRoutes"]:
-                if labels or networks:
-                    if networks and ipnetwork.contain_any_prefix(
-                        route["dest"], networks
-                    ):
-                        filtered_unicast_routes.append(route)
-                else:
-                    filtered_unicast_routes.append(route)
+            filtered_unicast_routes = [
+                route
+                for route in routes["unicastRoutes"]
+                if networks
+                and ipnetwork.contain_any_prefix(route["dest"], networks)
+            ]
+
             routes["unicastRoutes"] = filtered_unicast_routes
 
         if "mplsRoutes" in routes:
-            filtered_mpls_routes = []
-            for route in routes["mplsRoutes"]:
-                if labels or prefixes:
-                    if labels and int(route["topLabel"]) in labels:
-                        filtered_mpls_routes.append(route)
-                else:
-                    filtered_mpls_routes.append(route)
+            filtered_mpls_routes = [
+                route
+                for route in routes["mplsRoutes"]
+                if labels and int(route["topLabel"]) in labels
+            ]
+
             routes["mplsRoutes"] = filtered_mpls_routes
 
     print(json_dumps(route_db_dict))
@@ -878,13 +875,14 @@ def print_route_db(
 
     if prefixes or not labels:
         print_unicast_routes(
-            "Unicast Routes for {}".format(route_db.thisNodeName),
+            f"Unicast Routes for {route_db.thisNodeName}",
             route_db.unicastRoutes,
             prefixes=prefixes,
         )
+
     if labels or not prefixes:
         print_mpls_routes(
-            "MPLS Routes for {}".format(route_db.thisNodeName),
+            f"MPLS Routes for {route_db.thisNodeName}",
             route_db.mplsRoutes,
             labels=labels,
         )
@@ -990,17 +988,18 @@ def adj_list_deltas_json(adj_deltas_list, tags=None):
             return_code = 1
         else:
             raise ValueError(
-                'Unexpected change type "{}" in adjacency deltas list'.format(data[0])
+                f'Unexpected change type "{data[0]}" in adjacency deltas list'
             )
+
 
     deltas_json = {}
 
     if nodes_down:
-        deltas_json.update({tags[0]: nodes_down})
+        deltas_json[tags[0]] = nodes_down
     if nodes_up:
-        deltas_json.update({tags[1]: nodes_up})
+        deltas_json[tags[1]] = nodes_up
     if nodes_update:
-        deltas_json.update({tags[2]: nodes_update})
+        deltas_json[tags[2]] = nodes_update
 
     return deltas_json, return_code
 
@@ -1020,12 +1019,14 @@ def sprint_adj_delta(old_adj, new_adj):
     new_adj_dict = object_to_dict(new_adj)
     if old_adj is not None:
         old_adj_dict = object_to_dict(old_adj)
-        for k in sorted(new_adj_dict.keys()):
-            if old_adj_dict.get(k) != new_adj_dict.get(k):
-                rows.append([k, old_adj_dict.get(k), "-->", new_adj_dict.get(k)])
+        rows.extend(
+            [k, old_adj_dict.get(k), "-->", new_adj_dict.get(k)]
+            for k in sorted(new_adj_dict.keys())
+            if old_adj_dict.get(k) != new_adj_dict.get(k)
+        )
+
     else:
-        for k in sorted(new_adj_dict.keys()):
-            rows.append([k, new_adj_dict[k]])
+        rows.extend([k, new_adj_dict[k]] for k in sorted(new_adj_dict.keys()))
     return printing.render_horizontal_table(rows)
 
 
@@ -1075,7 +1076,7 @@ def update_global_prefix_db(
     for prefix_entry in prefix_db.prefixEntries:
         addr_str = ipnetwork.sprint_addr(prefix_entry.prefix.prefixAddress.addr)
         prefix_len = prefix_entry.prefix.prefixLength
-        prefix_set.add("{}/{}".format(addr_str, prefix_len))
+        prefix_set.add(f"{addr_str}/{prefix_len}")
 
     # per prefix key format contains only one key, it can be an 'add' or 'delete'
     if key and re.match(Consts.PER_PREFIX_KEY_REGEX, key):
@@ -1110,20 +1111,12 @@ def sprint_adj_db_delta(new_adj_db, old_adj_db):
 
     for change_type, old_adj, new_adj in adj_list_deltas:
         if change_type == "NEIGHBOR_DOWN":
+            strs.append(f"{change_type}: {old_adj.otherNodeName} via {old_adj.ifName}")
+        if change_type in ["NEIGHBOR_UP", "NEIGHBOR_UPDATE"]:
             strs.append(
-                "{}: {} via {}".format(
-                    change_type, old_adj.otherNodeName, old_adj.ifName
-                )
+                f"{change_type}: {new_adj.otherNodeName} via {new_adj.ifName}\n{sprint_adj_delta(old_adj, new_adj)}"
             )
-        if change_type == "NEIGHBOR_UP" or change_type == "NEIGHBOR_UPDATE":
-            strs.append(
-                "{}: {} via {}\n{}".format(
-                    change_type,
-                    new_adj.otherNodeName,
-                    new_adj.ifName,
-                    sprint_adj_delta(old_adj, new_adj),
-                )
-            )
+
 
     # check for other adjDB changes
     old_db_dict = copy.copy(old_adj_db).__dict__
@@ -1133,11 +1126,13 @@ def sprint_adj_db_delta(new_adj_db, old_adj_db):
     new_db_dict.pop("adjacencies", None)
     new_db_dict.pop("perfEvents", None)
     if new_db_dict != old_db_dict:
-        rows = []
-        strs.append("ADJ_DB_UPDATE: {}".format(new_adj_db.thisNodeName))
-        for k in sorted(new_db_dict.keys()):
-            if old_db_dict.get(k) != new_db_dict.get(k):
-                rows.append([k, old_db_dict.get(k), "-->", new_db_dict.get(k)])
+        strs.append(f"ADJ_DB_UPDATE: {new_adj_db.thisNodeName}")
+        rows = [
+            [k, old_db_dict.get(k), "-->", new_db_dict.get(k)]
+            for k in sorted(new_db_dict.keys())
+            if old_db_dict.get(k) != new_db_dict.get(k)
+        ]
+
         strs.append(printing.render_horizontal_table(rows, tablefmt="plain"))
 
     return strs
@@ -1166,10 +1161,11 @@ def sprint_prefixes_db_delta(
 
     added_prefixes = set()
     removed_prefixes = set()
-    cur_prefixes = set()
+    cur_prefixes = {
+        ipnetwork.sprint_prefix(prefix_entry.prefix)
+        for prefix_entry in prefix_db.prefixEntries
+    }
 
-    for prefix_entry in prefix_db.prefixEntries:
-        cur_prefixes.add(ipnetwork.sprint_prefix(prefix_entry.prefix))
 
     # per prefix key format contains only one key, it can be an 'add' or 'delete'
     if key and re.match(Consts.PER_PREFIX_KEY_REGEX, key):
@@ -1181,8 +1177,8 @@ def sprint_prefixes_db_delta(
         added_prefixes = cur_prefixes - prev_prefixes
         removed_prefixes = prev_prefixes - cur_prefixes
 
-    strs = ["+ {}".format(prefix) for prefix in added_prefixes]
-    strs.extend(["- {}".format(prefix) for prefix in removed_prefixes])
+    strs = [f"+ {prefix}" for prefix in added_prefixes]
+    strs.extend([f"- {prefix}" for prefix in removed_prefixes])
 
     return strs
 
@@ -1208,10 +1204,12 @@ def dump_node_kvs(
 def print_allocations_table(alloc_str):
     """print static allocations"""
 
-    rows = []
     allocations = deserialize_thrift_object(alloc_str, openr_types.StaticAllocation)
-    for node, prefix in allocations.nodePrefixes.items():
-        rows.append([node, ipnetwork.sprint_prefix(prefix)])
+    rows = [
+        [node, ipnetwork.sprint_prefix(prefix)]
+        for node, prefix in allocations.nodePrefixes.items()
+    ]
+
     print(printing.render_horizontal_table(rows, ["Node", "Prefix"]))
 
 
@@ -1267,15 +1265,7 @@ def get_route_as_dict_in_str(
     # Thrift object instances do not have hash support
     # Make custom stringified object so we can hash and diff
     # dict of prefixes(str) : nexthops(str)
-    if route_type == "unicast":
-        routes_dict = {
-            # pyre-fixme[16]: `MplsRoute` has no attribute `dest`.
-            ipnetwork.sprint_prefix(route.dest): sorted(
-                ip_nexthop_to_str(nh, True) for nh in route.nextHops
-            )
-            for route in routes
-        }
-    elif route_type == "mpls":
+    if route_type == "mpls":
         routes_dict = {
             # pyre-fixme[16]: `UnicastRoute` has no attribute `topLabel`.
             str(route.topLabel): sorted(
@@ -1283,8 +1273,16 @@ def get_route_as_dict_in_str(
             )
             for route in routes
         }
+    elif route_type == "unicast":
+        routes_dict = {
+            # pyre-fixme[16]: `MplsRoute` has no attribute `dest`.
+            ipnetwork.sprint_prefix(route.dest): sorted(
+                ip_nexthop_to_str(nh, True) for nh in route.nextHops
+            )
+            for route in routes
+        }
     else:
-        assert 0, "Unknown route type %s" % route_type
+        assert 0, f"Unknown route type {route_type}"
 
     # pyre-fixme[7]: Expected `Dict[str, str]` but got `Dict[typing.Any, List[str]]`.
     return routes_dict
@@ -1300,16 +1298,16 @@ def get_route_as_dict(
     """
     routes_dict = {}
 
-    if route_type == "unicast":
-        for route in routes:
-            # pyre-fixme[16]: `MplsRoute` has no attribute `dest`.
-            routes_dict[ipnetwork.sprint_prefix(route.dest)] = route
-    elif route_type == "mpls":
+    if route_type == "mpls":
         for route in routes:
             # pyre-fixme[16]: `UnicastRoute` has no attribute `topLabel`.
             routes_dict[str(route.topLabel)] = route
+    elif route_type == "unicast":
+        for route in routes:
+            # pyre-fixme[16]: `MplsRoute` has no attribute `dest`.
+            routes_dict[ipnetwork.sprint_prefix(route.dest)] = route
     else:
-        assert 0, "Unknown route type %s" % route_type
+        assert 0, f"Unknown route type {route_type}"
 
     return routes_dict
 
@@ -1323,8 +1321,6 @@ def routes_difference(
     Get routeDb delta between provided inputs
     """
 
-    diff = []
-
     # dict of prefixes(str) : nexthops(str)
     _lhs = get_route_as_dict(lhs, route_type)
     _rhs = get_route_as_dict(rhs, route_type)
@@ -1333,10 +1329,7 @@ def routes_difference(
     #   1. dest for network_types.UnicastRoute
     #   2. topLabel for network_types.MplsRoute
     diff_keys = set(_lhs) - set(_rhs)
-    for key in diff_keys:
-        diff.append(_lhs[key])
-
-    return diff
+    return [_lhs[key] for key in diff_keys]
 
 
 def prefixes_with_different_nexthops(
@@ -1357,12 +1350,11 @@ def prefixes_with_different_nexthops(
     _rhs = get_route_as_dict_in_str(rhs, route_type)
     common_keys = set(_lhs) & set(_rhs)
 
-    if route_type == "unicast":
-        for key in common_keys:
+    for key in common_keys:
+        if route_type == "unicast":
             if _lhs[key] != _rhs[key]:
                 keys.append((key, _lhs[key], _rhs[key]))
-    elif route_type == "mpls":
-        for key in common_keys:
+        elif route_type == "mpls":
             nh_diff_found = False
             l_nh_coll = _lhs[key]
             r_nh_coll = _rhs[key]
@@ -1371,7 +1363,7 @@ def prefixes_with_different_nexthops(
                 continue
 
             # iterate through every single nexthop for this key
-            for index in range(0, len(l_nh_coll)):
+            for index in range(len(l_nh_coll)):
                 l_nh = l_nh_coll[index]
                 r_nh = r_nh_coll[index]
                 if l_nh != r_nh:
@@ -1440,29 +1432,29 @@ def compare_route_db(
         print("{} and {} routing table do not match".format(*sources))
     if extra_routes_in_a:
         caption = "Routes in {} but not in {}".format(*sources)
-        if not quiet:
-            if route_type == "unicast":
-                print_unicast_routes(caption, _only_unicast_routes(extra_routes_in_a))
-            elif route_type == "mpls":
-                print_mpls_routes(caption, _only_mpls_routes(extra_routes_in_a))
-        else:
+        if quiet:
             error_msg.append(caption)
 
+        elif route_type == "mpls":
+            print_mpls_routes(caption, _only_mpls_routes(extra_routes_in_a))
+        elif route_type == "unicast":
+            print_unicast_routes(caption, _only_unicast_routes(extra_routes_in_a))
     if extra_routes_in_b:
         caption = "Routes in {} but not in {}".format(*reversed(sources))
-        if not quiet:
-            if route_type == "unicast":
-                print_unicast_routes(caption, _only_unicast_routes(extra_routes_in_b))
-            elif route_type == "mpls":
-                print_mpls_routes(caption, _only_mpls_routes(extra_routes_in_b))
-        else:
+        if quiet:
             error_msg.append(caption)
 
+        elif route_type == "mpls":
+            print_mpls_routes(caption, _only_mpls_routes(extra_routes_in_b))
+        elif route_type == "unicast":
+            print_unicast_routes(caption, _only_unicast_routes(extra_routes_in_b))
     if diff_prefixes:
         caption = "Prefixes have different nexthops in {} and {}".format(*sources)
-        rows = []
-        for prefix, lhs_nexthops, rhs_nexthops in diff_prefixes:
-            rows.append([prefix, len(lhs_nexthops), len(rhs_nexthops)])
+        rows = [
+            [prefix, len(lhs_nexthops), len(rhs_nexthops)]
+            for prefix, lhs_nexthops, rhs_nexthops in diff_prefixes
+        ]
+
         column_labels = ["Prefix"] + sources
         if not quiet:
             print(
@@ -1554,7 +1546,7 @@ def validate_route_nexthops(routes, interfaces, sources, quiet=False):
         print("Route validation failed")
     # Output report per error type
     for err, route_db in invalid_routes.items():
-        caption = "Error: {}".format(err)
+        caption = f"Error: {err}"
         if not quiet:
             print_unicast_routes(caption, route_db)
         else:
@@ -1596,16 +1588,15 @@ def ip_nexthop_to_str(
     """
 
     nh = nextHop.address
-    ifName = "%{}".format(nh.ifName) if nh.ifName else ""
+    ifName = f"%{nh.ifName}" if nh.ifName else ""
     if len(nh.addr) == 4 and ignore_v4_iface:
         ifName = ""
     if len(nh.addr) == 16 and ignore_v6_iface:
         ifName = ""
-    addr_str = "{}{}".format(ipnetwork.sprint_addr(nh.addr), ifName)
+    addr_str = f"{ipnetwork.sprint_addr(nh.addr)}{ifName}"
 
     mpls_action_str = " "
-    mpls_action = nextHop.mplsAction
-    if mpls_action:
+    if mpls_action := nextHop.mplsAction:
         mpls_action_str += mpls_action_to_str(mpls_action)
 
     # NOTE: Default weight=0 is in-fact weight=1
@@ -1639,16 +1630,12 @@ def print_unicast_routes(
         :param timestamp: Prints time for each item. (bool)
     """
 
-    networks = None
-    if prefixes:
-        networks = [ipaddress.ip_network(p) for p in prefixes]
-
+    networks = [ipaddress.ip_network(p) for p in prefixes] if prefixes else None
     route_strs = []
     for route in unicast_routes:
-        entry = build_unicast_route(route, filter_for_networks=networks)
-        if entry:
+        if entry := build_unicast_route(route, filter_for_networks=networks):
             dest, nexthops = entry
-            paths_str = "\n".join(["  via {}".format(nh) for nh in nexthops])
+            paths_str = "\n".join([f"  via {nh}" for nh in nexthops])
             route_strs.append([dest, paths_str])
 
     print(
@@ -1676,13 +1663,13 @@ def build_unicast_route(
         :param filter_exact_match: Indicate exact match or subnet match.
     """
     dest = ipnetwork.sprint_prefix(route.dest)
-    if filter_for_networks:
-        if filter_exact_match:
-            if not ipaddress.ip_network(dest) in filter_for_networks:
-                return ("", [])
-        else:
-            if not ipnetwork.contain_any_prefix(dest, filter_for_networks):
-                return ("", [])
+    if filter_for_networks and (
+        filter_exact_match
+        and ipaddress.ip_network(dest) not in filter_for_networks
+        or not filter_exact_match
+        and not ipnetwork.contain_any_prefix(dest, filter_for_networks)
+    ):
+        return ("", [])
     nexthops = [ip_nexthop_to_str(nh) for nh in route.nextHops]
     return dest, nexthops
 
@@ -1713,8 +1700,9 @@ def print_mpls_routes(
             continue
 
         paths_str = "\n".join(
-            ["  via {}".format(ip_nexthop_to_str(nh)) for nh in route.nextHops]
+            [f"  via {ip_nexthop_to_str(nh)}" for nh in route.nextHops]
         )
+
         route_strs.append([str(route.topLabel), paths_str])
 
     print(
@@ -1736,10 +1724,7 @@ def get_routes_json(
     mpls_routes: Optional[List[network_types.MplsRoute]],
     labels: Optional[List[int]],
 ):
-    networks = None
-    if prefixes:
-        networks = [ipaddress.ip_network(p) for p in prefixes]
-
+    networks = [ipaddress.ip_network(p) for p in prefixes] if prefixes else None
     data = {"host": host, "client": client, "routes": [], "mplsRoutes": []}
 
     for route in routes:

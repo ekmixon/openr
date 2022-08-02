@@ -14,7 +14,7 @@ class SparkCli(object):
 
     @click.group()
     @click.pass_context
-    def spark(ctx):  # noqa: B902
+    def spark(self):    # noqa: B902
         """CLI tool to peek into Spark information."""
         pass
 
@@ -23,7 +23,7 @@ class SparkGRCli(object):
     @click.command()
     @click.option("--yes", is_flag=True, help="Make command non-interactive")
     @click.pass_obj
-    def graceful_restart(cli_opts, yes):  # noqa: B902
+    def graceful_restart(self, yes):    # noqa: B902
         """Force to send out restarting msg indicating GR"""
 
-        spark.GracefulRestartCmd(cli_opts).run(yes)
+        spark.GracefulRestartCmd(self).run(yes)

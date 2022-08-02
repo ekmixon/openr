@@ -152,7 +152,7 @@ class PathCmd(OpenrCtrlCmd):
 
         loopback_set = set()
         self.iter_dbs(loopback_set, self.prefix_dbs, node, _parse)
-        return loopback_set.pop() if len(loopback_set) > 0 else None
+        return loopback_set.pop() if loopback_set else None
 
     def get_node_prefixes(self, node, ipv4=False):
         def _parse(prefix_set, prefix_db):
@@ -191,10 +191,9 @@ class PathCmd(OpenrCtrlCmd):
                 next_hop_prefix_len = route.dest.prefixLength
                 if next_hop_prefix_len == max_prefix_len:
                     raise Exception(
-                        "Duplicate prefix found in routing table {}".format(
-                            ipnetwork.sprint_prefix(route.dest)
-                        )
+                        f"Duplicate prefix found in routing table {ipnetwork.sprint_prefix(route.dest)}"
                     )
+
                 elif next_hop_prefix_len > max_prefix_len:
                     lpm_route = route
                     max_prefix_len = next_hop_prefix_len
@@ -265,10 +264,14 @@ class PathCmd(OpenrCtrlCmd):
             routes = client.getRouteTableByClient(client.client_id)
         except Exception:
             return []
-        for route in routes:
-            if ipnetwork.sprint_prefix(route.dest) == dst_prefix:
-                return [nh.address for nh in route.nextHops]
-        return []
+        return next(
+            (
+                [nh.address for nh in route.nextHops]
+                for route in routes
+                if ipnetwork.sprint_prefix(route.dest) == dst_prefix
+            ),
+            [],
+        )
 
     def get_paths(
         self, client: OpenrCtrl.Client, src: str, dst: str, max_hop: int
@@ -413,21 +416,18 @@ class PathCmd(OpenrCtrlCmd):
 
         column_labels = ["Hop", "NextHop Node", "Interface", "Metric", "NextHop-v6"]
 
-        print(
-            "{} {} found.".format(
-                len(paths), "path is" if len(paths) == 1 else "paths are"
-            )
-        )
+        print(f'{len(paths)} {"path is" if len(paths) == 1 else "paths are"} found.')
 
         for idx, path in enumerate(paths):
             print(
                 printing.render_horizontal_table(
                     path[1],
                     column_labels,
-                    caption="Path {}{}".format(idx + 1, "  *" if path[0] else ""),
+                    caption=f'Path {idx + 1}{"  *" if path[0] else ""}',
                     tablefmt="plain",
                 )
             )
+
             print()
 
 
@@ -552,21 +552,19 @@ class DecisionValidateCmd(OpenrCtrlCmd):
             )
             if return_code:
                 utils.print_json(deltas_json)
-        else:
-            lines = utils.sprint_adj_db_delta(kvstore_adj_db, decision_adj_db)
-            if lines:
-                print(
-                    printing.render_vertical_table(
+        elif lines := utils.sprint_adj_db_delta(kvstore_adj_db, decision_adj_db):
+            print(
+                printing.render_vertical_table(
+                    [
                         [
-                            [
-                                f"node {node_name}'s adj db in Decision out of "
-                                "sync with KvStore's"
-                            ]
+                            f"node {node_name}'s adj db in Decision out of "
+                            "sync with KvStore's"
                         ]
-                    )
+                    ]
                 )
-                print("\n".join(lines))
-                return_code = 1
+            )
+            print("\n".join(lines))
+            return_code = 1
 
         return return_code
 
@@ -597,18 +595,19 @@ class DecisionValidateCmd(OpenrCtrlCmd):
 
             decision_prefix_set = {}
             utils.update_global_prefix_db(decision_prefix_set, prefix_db)
-            lines = utils.sprint_prefixes_db_delta(decision_prefix_set, prefix_db)
-            if lines:
+            if lines := utils.sprint_prefixes_db_delta(
+                decision_prefix_set, prefix_db
+            ):
                 print(
                     printing.render_vertical_table(
                         [
                             [
-                                "node {}'s prefix db in Decision out of sync with "
-                                "KvStore's".format(node_name)
+                                f"node {node_name}'s prefix db in Decision out of sync with KvStore's"
                             ]
                         ]
                     )
                 )
+
                 print("\n".join(lines))
                 return 1, decision_prefix_nodes
         return 0, decision_prefix_nodes
@@ -627,14 +626,10 @@ class DecisionValidateCmd(OpenrCtrlCmd):
         return_code = 0
 
         if json:
-            diffs_up = []
-            diffs_down = []
-            for node in a_minus_b:
-                diffs_up.append(node)
-            for node in b_minus_a:
-                diffs_down.append(node)
-
+            diffs_up = list(a_minus_b)
+            diffs_down = list(b_minus_a)
             if diffs_up or diffs_down:
+                return_code = 1
                 diffs = {
                     "db_type": db_type,
                     "db_up": db_sources[0],
@@ -642,27 +637,28 @@ class DecisionValidateCmd(OpenrCtrlCmd):
                     "nodes_up": diffs_up,
                     "nodes_down": diffs_down,
                 }
-                return_code = 1
+
                 utils.print_json(diffs)
 
         else:
-            rows = []
-            for node in a_minus_b:
-                rows.append(
-                    [
-                        "node {}'s {} db in {} but not in {}".format(
-                            node, db_type, *db_sources
-                        )
-                    ]
-                )
-            for node in b_minus_a:
-                rows.append(
-                    [
-                        "node {}'s {} db in {} but not in {}".format(
-                            node, db_type, *reversed(db_sources)
-                        )
-                    ]
-                )
+            rows = [
+                [
+                    "node {}'s {} db in {} but not in {}".format(
+                        node, db_type, *db_sources
+                    )
+                ]
+                for node in a_minus_b
+            ]
+
+            rows.extend(
+                [
+                    "node {}'s {} db in {} but not in {}".format(
+                        node, db_type, *reversed(db_sources)
+                    )
+                ]
+                for node in b_minus_a
+            )
+
             if rows:
                 print(printing.render_vertical_table(rows))
                 return_code = 1
@@ -690,7 +686,7 @@ class DecisionRibPolicyCmd(OpenrCtrlCmd):
         try:
             policy = client.getRibPolicy()
         except ctrl_types.OpenrError as e:
-            print("Error: ", str(e), "\nSystem standard error: ", sys.stderr)
+            print("Error: ", e, "\nSystem standard error: ", sys.stderr)
             return
 
         # Convert the prefixes to readable format
@@ -775,9 +771,11 @@ class ReceivedRoutesCmd(OpenrCtrlCmd):
         """
 
         def key_fn(key: utils.PrintAdvertisedTypes) -> Tuple[str, str]:
-            if not isinstance(key, ctrl_types.NodeAndArea):
-                return ("", "")
-            return (key.node, key.area)
+            return (
+                (key.node, key.area)
+                if isinstance(key, ctrl_types.NodeAndArea)
+                else ("", "")
+            )
 
         tag_to_name = (
             utils.get_tag_to_name_map(self._get_config()) if tag2name else None

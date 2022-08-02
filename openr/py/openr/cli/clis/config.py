@@ -30,7 +30,7 @@ class ConfigCli:
 
     @click.group()
     @click.pass_context
-    def config(ctx: Bunch) -> None:  # noqa: B902
+    def config(self) -> None:    # noqa: B902
         """CLI tool to peek into Config Store module."""
         pass
 
@@ -38,10 +38,10 @@ class ConfigCli:
 class ConfigShowCli:
     @click.command()
     @click.pass_obj
-    def show(cli_opts: Bunch) -> None:  # noqa: B902
+    def show(self) -> None:    # noqa: B902
         """Show openr running config"""
 
-        config.ConfigShowCmd(cli_opts).run()
+        config.ConfigShowCmd(self).run()
 
 
 class ConfigDryRunCli:
@@ -49,7 +49,7 @@ class ConfigDryRunCli:
     @click.argument("file")
     @click.pass_obj
     @click.pass_context
-    def dryrun(ctx: click.Context, cli_opts: Bunch, file: str) -> None:  # noqa: B902
+    def dryrun(self, cli_opts: Bunch, file: str) -> None:    # noqa: B902
         """Dryrun/validate openr config, output JSON parsed config upon success"""
 
         config.ConfigDryRunCmd(cli_opts).run(file)
@@ -64,47 +64,47 @@ class ConfigCompareCli:
     @click.command()
     @click.argument("file")
     @click.pass_obj
-    def compare(cli_opts: Bunch, file: str) -> None:  # noqa: B902
+    def compare(self, file: str) -> None:    # noqa: B902
         """Migration cli: Compare config with current running config"""
 
-        config.ConfigCompareCmd(cli_opts).run(file)
+        config.ConfigCompareCmd(self).run(file)
 
 
 class ConfigPrefixAllocatorCli:
     @click.command()
     @click.pass_obj
-    def config_prefix_allocator(cli_opts):  # noqa: B902
+    def config_prefix_allocator(self):    # noqa: B902
         """Dump prefix allocation config"""
 
-        config.ConfigPrefixAllocatorCmd(cli_opts).run()
+        config.ConfigPrefixAllocatorCmd(self).run()
 
 
 class ConfigLinkMonitorCli:
     @click.command()
     @click.pass_obj
-    def config_link_monitor(cli_opts):  # noqa: B902
+    def config_link_monitor(self):    # noqa: B902
         """Dump link monitor config"""
 
-        config.ConfigLinkMonitorCmd(cli_opts).run()
+        config.ConfigLinkMonitorCmd(self).run()
 
 
 class ConfigPrefixManagerCli:
     @click.command()
     @click.pass_obj
-    def config_prefix_manager(cli_opts):  # noqa: B902
+    def config_prefix_manager(self):    # noqa: B902
         """Dump prefix manager config"""
 
-        config.ConfigPrefixManagerCmd(cli_opts).run()
+        config.ConfigPrefixManagerCmd(self).run()
 
 
 class ConfigEraseCli:
     @click.command()
     @click.argument("key")
     @click.pass_obj
-    def config_erase(cli_opts, key):  # noqa: B902
+    def config_erase(self, key):    # noqa: B902
         """Erase a config key"""
 
-        config.ConfigEraseCmd(cli_opts).run(key)
+        config.ConfigEraseCmd(self).run(key)
 
 
 class ConfigStoreCli:
@@ -112,7 +112,7 @@ class ConfigStoreCli:
     @click.argument("key")
     @click.argument("value")
     @click.pass_obj
-    def config_store(cli_opts, key, value):  # noqa: B902
+    def config_store(self, key, value):    # noqa: B902
         """Store a config key"""
 
-        config.ConfigStoreCmd(cli_opts).run(key, value)
+        config.ConfigStoreCmd(self).run(key, value)

@@ -39,7 +39,7 @@ class FibAgentCmd(object):
                 cli_opts.client_id,
             )
         except Exception as e:
-            print("Failed to get communicate to Fib. {}".format(e))
+            print(f"Failed to get communicate to Fib. {e}")
             print(
                 "Note: Specify correct host with -H/--host option and "
                 + "make sure that Fib is running on the host or ports "
@@ -70,7 +70,7 @@ class FibUnicastRoutesCmd(OpenrCtrlCmd):
             utils.print_routes_json(route_dict)
         else:
             utils.print_unicast_routes(
-                "Unicast Routes for {}".format(host_name), unicast_route_list
+                f"Unicast Routes for {host_name}", unicast_route_list
             )
 
 
@@ -94,9 +94,7 @@ class FibMplsRoutesCmd(OpenrCtrlCmd):
             route_dict = {host_name: routes}
             utils.print_routes_json(route_dict)
         else:
-            utils.print_mpls_routes(
-                "MPLS Routes for {}".format(host_name), mpls_route_list
-            )
+            utils.print_mpls_routes(f"MPLS Routes for {host_name}", mpls_route_list)
 
 
 class FibCountersCmd(FibAgentCmd):
@@ -106,7 +104,7 @@ class FibCountersCmd(FibAgentCmd):
             return 0
         except Exception as e:
             print("Failed to get counter from Fib")
-            print("Exception: {}".format(e))
+            print(f"Exception: {e}")
             return 1
 
     def print_counters(self, counters, json_opt):
@@ -114,14 +112,12 @@ class FibCountersCmd(FibAgentCmd):
 
         with utils.get_openr_ctrl_client(self.cli_opts.host, self.cli_opts) as client:
             host_id = client.getMyNodeName()
-        caption = "{}'s Fib counters".format(host_id)
+        caption = f"{host_id}'s Fib counters"
 
         if json_opt:
             utils.print_json(counters)
         else:
-            rows = []
-            for key in counters:
-                rows.append(["{} : {}".format(key, counters[key])])
+            rows = [[f"{key} : {counters[key]}"] for key in counters]
             print(
                 printing.render_horizontal_table(
                     rows, caption=caption, tablefmt="plain"
@@ -146,7 +142,7 @@ class FibRoutesInstalledCmd(FibAgentCmd):
             routes = self.client.getRouteTableByClient(client_id)
         except Exception as e:
             print("Failed to get routes from Fib.")
-            print("Exception: {}".format(e))
+            print(f"Exception: {e}")
             return 1
 
         try:
@@ -177,10 +173,10 @@ class FibAddRoutesCmd(FibAgentCmd):
             self.client.addUnicastRoutes(self.client.client_id, routes)
         except Exception as e:
             print("Failed to add routes.")
-            print("Exception: {}".format(e))
+            print(f"Exception: {e}")
             return 1
 
-        print("Added {} routes.".format(len(routes)))
+        print(f"Added {len(routes)} routes.")
         return 0
 
 
@@ -191,10 +187,10 @@ class FibDelRoutesCmd(FibAgentCmd):
             self.client.deleteUnicastRoutes(self.client.client_id, prefixes)
         except Exception as e:
             print("Failed to delete routes.")
-            print("Exception: {}".format(e))
+            print(f"Exception: {e}")
             return 1
 
-        print("Deleted {} routes.".format(len(prefixes)))
+        print(f"Deleted {len(prefixes)} routes.")
         return 0
 
 
@@ -206,10 +202,10 @@ class FibSyncRoutesCmd(FibAgentCmd):
             self.client.syncFib(self.client.client_id, routes)
         except Exception as e:
             print("Failed to sync routes.")
-            print("Exception: {}".format(e))
+            print(f"Exception: {e}")
             return 1
 
-        print("Reprogrammed FIB with {} routes.".format(len(routes)))
+        print(f"Reprogrammed FIB with {len(routes)} routes.")
         return 0
 
 
@@ -241,9 +237,9 @@ class FibValidateRoutesCmd(FibAgentCmd):
 
         except Exception as e:
             print("Failed to validate Fib routes.")
-            print("Exception: {}".format(e))
+            print(f"Exception: {e}")
             raise e
-            # return 1
+                # return 1
 
         (ret, _) = utils.compare_route_db(
             decision_unicast_routes,
@@ -315,16 +311,13 @@ class FibSnoopCmd(OpenrCtrlCmd):
         if prefixes_filter:
             filter_for_networks = [ipaddress.ip_network(p) for p in prefixes_filter]
 
-        prefix_strs = []
-        for ip_prefix in ip_prefixes:
-            if (
-                filter_for_networks
-                and not ipaddress.ip_network(ipnetwork.sprint_prefix(ip_prefix))
-                in filter_for_networks
-            ):
-                continue
-
-            prefix_strs.append([ipnetwork.sprint_prefix(ip_prefix)])
+        prefix_strs = [
+            [ipnetwork.sprint_prefix(ip_prefix)]
+            for ip_prefix in ip_prefixes
+            if not filter_for_networks
+            or ipaddress.ip_network(ipnetwork.sprint_prefix(ip_prefix))
+            in filter_for_networks
+        ]
 
         print(
             printing.render_vertical_table(
@@ -520,14 +513,12 @@ class StreamSummaryCmd(OpenrCtrlCmd):
             uptime = uptime_str.split(".")[0]
             last_msg_time = last_msg_time_str
 
-        # assert isinstance(stream_session_info, StreamSubscriberInfo)
-        row = [
+        return [
             stream_session_info.subscriber_id,
             uptime,
             stream_session_info.total_streamed_msgs,
             last_msg_time,
         ]
-        return row
 
     def run(self, *args, **kwargs) -> int:
         async def _wrapper() -> int:

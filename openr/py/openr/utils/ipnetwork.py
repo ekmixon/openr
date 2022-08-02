@@ -18,10 +18,7 @@ from openr.Types import ttypes as openr_types
 def sprint_addr(addr: bytes) -> str:
     """binary ip addr -> string"""
 
-    if not len(addr) or not addr:
-        return ""
-
-    return str(ipaddress.ip_address(addr))
+    return "" if not len(addr) or not addr else str(ipaddress.ip_address(addr))
 
 
 def sprint_prefix(
@@ -206,12 +203,9 @@ def is_same_subnet(addr1, addr2, subnet):
     Check whether two given addresses belong to the same subnet
     """
 
-    if ipaddress.ip_network((addr1, subnet), strict=False) == ipaddress.ip_network(
-        (addr2, subnet), strict=False
-    ):
-        return True
-
-    return False
+    return ipaddress.ip_network(
+        (addr1, subnet), strict=False
+    ) == ipaddress.ip_network((addr2, subnet), strict=False)
 
 
 def is_link_local(addr):

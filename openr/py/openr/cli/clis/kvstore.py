@@ -42,7 +42,7 @@ class KvStoreCli(object):
     @click.group()
     @breeze_option("--area", type=str, help="area identifier")
     @click.pass_context
-    def kvstore(ctx, area):  # noqa: B902
+    def kvstore(self, area):    # noqa: B902
         """CLI tool to peek into KvStore module."""
         pass
 
@@ -64,17 +64,11 @@ class PrefixesCli(object):
         help="Client type filter. Provide name e.g. loopback, bgp",
     )
     @click.pass_obj
-    def prefixes(
-        cli_opts: Any,  # noqa: B902
-        nodes: List[str],
-        json: bool,
-        prefix: str,
-        client_type: str,
-    ) -> None:
+    def prefixes(self, nodes: List[str], json: bool, prefix: str, client_type: str) -> None:
         """show the prefixes in the network"""
 
-        nodes = parse_nodes(cli_opts, nodes)
-        kvstore.PrefixesCmd(cli_opts).run(nodes, json, prefix, client_type)
+        nodes = parse_nodes(self, nodes)
+        kvstore.PrefixesCmd(self).run(nodes, json, prefix, client_type)
 
 
 class KeysCli(object):
@@ -86,29 +80,29 @@ class KeysCli(object):
         "--ttl/--no-ttl", default=False, help="Show ttl value and version as well"
     )
     @click.pass_obj
-    def keys(cli_opts, json, prefix, originator, ttl):  # noqa: B902
+    def keys(self, json, prefix, originator, ttl):    # noqa: B902
         """dump all available keys"""
 
-        kvstore.KeysCmd(cli_opts).run(json, prefix, originator, ttl)
+        kvstore.KeysCmd(self).run(json, prefix, originator, ttl)
 
 
 class KeyValsCli(object):
     @click.command()
     @click.argument("keys", nargs=-1, required=True)
     @click.pass_obj
-    def keyvals(cli_opts, keys):  # noqa: B902
+    def keyvals(self, keys):    # noqa: B902
         """get values of input keys"""
 
-        kvstore.KeyValsCmd(cli_opts).run(keys)
+        kvstore.KeyValsCmd(self).run(keys)
 
 
 class NodesCli(object):
     @click.command()
     @click.pass_obj
-    def nodes(cli_opts):  # noqa: B902
+    def nodes(self):    # noqa: B902
         """show nodes info"""
 
-        kvstore.NodesCmd(cli_opts).run()
+        kvstore.NodesCmd(self).run()
 
 
 # TODO: Remove in a month
@@ -125,13 +119,7 @@ class AdjCli(object):
     @click.option("--json/--no-json", default=False, help="Dump in JSON format")
     @click.pass_obj
     @click.pass_context
-    def adj(
-        ctx: click.Context,  # noqa: B902
-        cli_opts: Bunch,
-        nodes: str,
-        bidir: bool,
-        json: bool,
-    ) -> None:
+    def adj(self, cli_opts: Bunch, nodes: str, bidir: bool, json: bool) -> None:
         """dump the link-state adjacencies - Deprecated"""
 
         click.secho(
@@ -139,16 +127,16 @@ class AdjCli(object):
             bold=True,
             err=True,
         )
-        ctx.exit(1)
+        self.exit(1)
 
 
 class AreasCli(object):
     @click.command()
     @click.option("--json/--no-json", default=False, help="Dump in JSON format")
     @click.pass_obj
-    def areas(cli_opts: Bunch, json) -> None:  # noqa: B902
+    def areas(self, json) -> None:    # noqa: B902
         """get list of 'areas' configured"""
-        kvstore.Areas(cli_opts).run(json)
+        kvstore.Areas(self).run(json)
 
 
 class FloodCli(object):
@@ -160,14 +148,11 @@ class FloodCli(object):
         "root-id(s), get information for all roots if no root specified",
     )
     @click.pass_obj
-    def flood(cli_opts: Bunch, roots: str) -> None:  # noqa: B902
+    def flood(self, roots: str) -> None:    # noqa: B902
         """dump the flooding-topology information"""
 
-        if roots is not None:
-            roots_split = roots.split(",")
-        else:
-            roots_split = []
-        kvstore.FloodCmd(cli_opts).run(roots_split)
+        roots_split = roots.split(",") if roots is not None else []
+        kvstore.FloodCmd(self).run(roots_split)
 
 
 class KvCompareCli(object):
@@ -180,29 +165,29 @@ class KvCompareCli(object):
         "Default will kv-compare against each peer.",
     )
     @click.pass_obj
-    def kv_compare(cli_opts, nodes):  # noqa: B902
+    def kv_compare(self, nodes):    # noqa: B902
         """get the kv store delta"""
 
-        kvstore.KvCompareCmd(cli_opts).run(nodes)
+        kvstore.KvCompareCmd(self).run(nodes)
 
 
 class PeersCli(object):
     @click.command()
     @click.pass_obj
-    def peers(cli_opts):  # noqa: B902
+    def peers(self):    # noqa: B902
         """show the KV store peers of the node"""
 
-        kvstore.PeersCmd(cli_opts).run()
+        kvstore.PeersCmd(self).run()
 
 
 class EraseKeyCli(object):
     @click.command()
     @click.argument("key")
     @click.pass_obj
-    def erase_key(cli_opts, key):  # noqa: B902
+    def erase_key(self, key):    # noqa: B902
         """erase key from kvstore"""
 
-        kvstore.EraseKeyCmd(cli_opts).run(key)
+        kvstore.EraseKeyCmd(self).run(key)
 
 
 class SetKeyCli(object):
@@ -221,12 +206,12 @@ class SetKeyCli(object):
         help="TTL in seconds. Default is infinite",
     )
     @click.pass_obj
-    def set_key(cli_opts, key, value, originator, version, ttl):  # noqa: B902
+    def set_key(self, key, value, originator, version, ttl):    # noqa: B902
         """Set a custom key into KvStore"""
 
         if ttl != Consts.CONST_TTL_INF:
             ttl = ttl * 1000
-        kvstore.SetKeyCmd(cli_opts).run(key, value, originator, version, ttl)
+        kvstore.SetKeyCmd(self).run(key, value, originator, version, ttl)
 
 
 class KvSignatureCli(object):
@@ -239,13 +224,13 @@ class KvSignatureCli(object):
         "the given prefix",
     )
     @click.pass_obj
-    def kv_signature(cli_opts, prefix):  # noqa: B902
+    def kv_signature(self, prefix):    # noqa: B902
         """Returns a signature of the contents of the KV store for comparison
         with other nodes.  In case of mismatch, use kv-compare to analyze
         differences
         """
 
-        kvstore.KvSignatureCmd(cli_opts).run(prefix)
+        kvstore.KvSignatureCmd(self).run(prefix)
 
 
 class SnoopCli(object):
@@ -281,22 +266,12 @@ class SnoopCli(object):
         "--print-initial", is_flag=True, help="Print initial snapshot before snooping"
     )
     @click.pass_obj
-    def snoop(
-        cli_opts: Bunch,  # noqa: B902
-        delta: bool,
-        ttl: bool,
-        regexes: Optional[List[str]],
-        duration: int,
-        originator_ids: Optional[AbstractSet[str]],
-        match_all: bool,
-        area: Set[str],
-        print_initial: bool,
-    ) -> None:
+    def snoop(self, delta: bool, ttl: bool, regexes: Optional[List[str]], duration: int, originator_ids: Optional[AbstractSet[str]], match_all: bool, area: Set[str], print_initial: bool) -> None:
         """Snoop on KV-store updates in the network. We are primarily
         looking at the adj/prefix announcements.
         """
 
-        kvstore.SnoopCmd(cli_opts).run(
+        kvstore.SnoopCmd(self).run(
             delta,
             ttl,
             regexes,
@@ -311,27 +286,27 @@ class SnoopCli(object):
 class AllocationsCli(object):
     @click.command()
     @click.pass_obj
-    def list(cli_opts):  # noqa: B902
+    def list(self):    # noqa: B902
         """View static allocations set in KvStore"""
 
-        kvstore.AllocationsListCmd(cli_opts).run()
+        kvstore.AllocationsListCmd(self).run()
 
     @click.command()
     @click.argument("node", nargs=1, required=True)
     @click.argument("prefix", nargs=1, required=True)
     @click.pass_obj
-    def set(cli_opts, node, prefix):  # noqa: B902
+    def set(self, node, prefix):    # noqa: B902
         """Set/Update prefix allocation for a certain node"""
 
-        kvstore.AllocationsSetCmd(cli_opts).run(node, prefix)
+        kvstore.AllocationsSetCmd(self).run(node, prefix)
 
     @click.command()
     @click.argument("node", nargs=1, required=True)
     @click.pass_obj
-    def unset(cli_opts, node):  # noqa: B902
+    def unset(self, node):    # noqa: B902
         """Unset prefix allocation for a certain node"""
 
-        kvstore.AllocationsUnsetCmd(cli_opts).run(node)
+        kvstore.AllocationsUnsetCmd(self).run(node)
 
 
 class SummaryCli(object):
@@ -348,16 +323,16 @@ class SummaryCli(object):
         "either of the two valid flags: -a or --areas",
     )
     @click.pass_obj
-    def summary(cli_opts: Bunch, area: List[str]) -> None:  # noqa: B902
+    def summary(self, area: List[str]) -> None:    # noqa: B902
         """show the KV store summary for each area"""
 
-        kvstore.SummaryCmd(cli_opts).run(set(area))
+        kvstore.SummaryCmd(self).run(set(area))
 
 
 class StreamSummaryCli(object):
     @click.command()
     @click.pass_obj
-    def stream_summary(cli_opts):  # noqa: B902
+    def stream_summary(self):    # noqa: B902
         """Show basic info on all KVstore subscribers"""
         cli_options = {}
-        kvstore.StreamSummaryCmd(cli_opts).run(cli_options)
+        kvstore.StreamSummaryCmd(self).run(cli_options)

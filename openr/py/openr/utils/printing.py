@@ -15,15 +15,11 @@ import tabulate
 def caption_fmt(caption):
     """Format a caption"""
 
-    if caption:
-        return "\n== {}  ==\n".format(caption)
-    return ""
+    return f"\n== {caption}  ==\n" if caption else ""
 
 
 def get_timestamp() -> str:
-    return "Timestamp: {}\n".format(
-        datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-    )
+    return f'Timestamp: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]}\n'
 
 
 def sprint_bytes(bytes: Union[int, float]) -> str:

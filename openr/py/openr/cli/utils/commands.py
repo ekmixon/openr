@@ -97,17 +97,16 @@ class OpenrCtrlCmd:
                 val = counters.get(key, None)
                 counters_rows.append([title, "N/A" if not val and val != 0 else val])
 
-            stats_cols = ["Stat", "1 min", "10 mins", "1 hour", "All Time"]
             stats_rows = []
             for title, key_prefix in template["stats"]:
                 row = [title]
-                for key in ["{}{}".format(key_prefix, s) for s in suffixes]:
+                for key in [f"{key_prefix}{s}" for s in suffixes]:
                     val = counters.get(key, None)
                     row.append("N/A" if not val and val != 0 else val)
                 stats_rows.append(row)
 
             if "title" in template:
-                print("\n> {} ".format(template["title"]))
+                print(f'\n> {template["title"]} ')
 
             if counters_rows:
                 print()
@@ -118,6 +117,7 @@ class OpenrCtrlCmd:
                 )
             if stats_rows:
                 print()
+                stats_cols = ["Stat", "1 min", "10 mins", "1 hour", "All Time"]
                 print(
                     printing.render_horizontal_table(
                         stats_rows, column_labels=stats_cols, tablefmt="simple"
@@ -135,8 +135,8 @@ class OpenrCtrlCmd:
         Build KeyDumpParams based on input parameter list
         """
         params = kv_store_types.KeyDumpParams(prefix)
-        params.originatorIds = originator_ids if originator_ids else None
-        params.keyValHashes = keyval_hash if keyval_hash else None
+        params.originatorIds = originator_ids or None
+        params.keyValHashes = keyval_hash or None
         if prefix:
             params.keys = [prefix]
 

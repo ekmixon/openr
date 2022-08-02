@@ -32,6 +32,6 @@ class ViewFibCmd(OpenrCtrlCmd):
                 total_duration += duration
                 recent_ts = perf_event.unixTs
                 rows.append([node_name, event_name, duration, recent_ts])
-            print("Perf Event Item: {}, total duration: {}ms".format(i, total_duration))
+            print(f"Perf Event Item: {i}, total duration: {total_duration}ms")
             print(tabulate.tabulate(rows, headers=headers))
             print()

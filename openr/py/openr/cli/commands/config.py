@@ -31,7 +31,7 @@ class ConfigDryRunCmd(OpenrCtrlCmd):
         try:
             file_conf = client.dryrunConfig(file)
         except OpenrError as ex:
-            click.echo(click.style("FAILED: {}".format(ex), fg="red"))
+            click.echo(click.style(f"FAILED: {ex}", fg="red"))
             return 1
 
         config = json.loads(file_conf)
@@ -46,13 +46,14 @@ class ConfigCompareCmd(OpenrCtrlCmd):
         try:
             file_conf = client.dryrunConfig(file)
         except OpenrError as ex:
-            click.echo(click.style("FAILED: {}".format(ex), fg="red"))
+            click.echo(click.style(f"FAILED: {ex}", fg="red"))
             return
 
-        res = jsondiff.diff(running_conf, file_conf, load=True, syntax="explicit")
-        if res:
+        if res := jsondiff.diff(
+            running_conf, file_conf, load=True, syntax="explicit"
+        ):
             click.echo(click.style("DIFF FOUND!", fg="red"))
-            print("== diff(running_conf, {}) ==".format(file))
+            print(f"== diff(running_conf, {file}) ==")
             print(res)
         else:
             click.echo(click.style("SAME", fg="green"))
@@ -67,7 +68,7 @@ class ConfigStoreCmdBase(OpenrCtrlCmd):
         try:
             blob = client.getConfigKey(config_key)
         except OpenrError as ex:
-            exception_str = "Exception getting key for {}: {}".format(config_key, ex)
+            exception_str = f"Exception getting key for {config_key}: {ex}"
 
         return (blob, exception_str)
 
@@ -92,14 +93,11 @@ class ConfigPrefixAllocatorCmd(ConfigStoreCmdBase):
         seed_prefix_addr = ipnetwork.sprint_addr(seed_prefix.prefixAddress.addr)
 
         caption = "Prefix Allocator parameters stored"
-        rows = []
-        rows.append(
-            ["Seed prefix: {}/{}".format(seed_prefix_addr, seed_prefix.prefixLength)]
-        )
-        rows.append(["Allocated prefix length: {}".format(prefix_alloc.allocPrefixLen)])
-        rows.append(
-            ["Allocated prefix index: {}".format(prefix_alloc.allocPrefixIndex)]
-        )
+        rows = [
+            [f"Seed prefix: {seed_prefix_addr}/{seed_prefix.prefixLength}"],
+            [f"Allocated prefix length: {prefix_alloc.allocPrefixLen}"],
+            [f"Allocated prefix index: {prefix_alloc.allocPrefixIndex}"],
+        ]
 
         print(printing.render_vertical_table(rows, caption=caption))
 
@@ -125,28 +123,24 @@ class ConfigLinkMonitorCmd(ConfigStoreCmdBase):
 
     def print_config(self, lm_config: openr_types.LinkMonitorState):
         caption = "Link Monitor parameters stored"
-        rows = []
-        rows.append(
-            ["isOverloaded: {}".format("Yes" if lm_config.isOverloaded else "No")]
-        )
-        rows.append(["nodeLabel: {}".format(lm_config.nodeLabel)])
-        rows.append(
-            ["overloadedLinks: {}".format(", ".join(lm_config.overloadedLinks))]
-        )
+        rows = [
+            [f'isOverloaded: {"Yes" if lm_config.isOverloaded else "No"}'],
+            [f"nodeLabel: {lm_config.nodeLabel}"],
+            [f'overloadedLinks: {", ".join(lm_config.overloadedLinks)}'],
+        ]
+
         print(printing.render_vertical_table(rows, caption=caption))
 
         print(printing.render_vertical_table([["linkMetricOverrides:"]]))
         column_labels = ["Interface", "Metric Override"]
-        rows = []
-        for (k, v) in sorted(lm_config.linkMetricOverrides.items()):
-            rows.append([k, v])
+        rows = [[k, v] for k, v in sorted(lm_config.linkMetricOverrides.items())]
         print(printing.render_horizontal_table(rows, column_labels=column_labels))
 
         print(printing.render_vertical_table([["adjMetricOverrides:"]]))
         column_labels = ["Adjacency", "Metric Override"]
         rows = []
         for (k, v) in sorted(lm_config.adjMetricOverrides.items()):
-            adj_str = k.nodeName + " " + k.ifName
+            adj_str = f"{k.nodeName} {k.ifName}"
             rows.append([adj_str, v])
         print(printing.render_horizontal_table(rows, column_labels=column_labels))
 
@@ -175,7 +169,7 @@ class ConfigPrefixManagerCmd(ConfigStoreCmdBase):
 class ConfigEraseCmd(ConfigStoreCmdBase):
     def _run(self, client: OpenrCtrl.Client, key: str, *args, **kwargs) -> None:
         client.eraseConfigKey(key)
-        print("Key:{} erased".format(key))
+        print(f"Key:{key} erased")
 
 
 class ConfigStoreCmd(ConfigStoreCmdBase):
@@ -190,4 +184,4 @@ class ConfigStoreCmd(ConfigStoreCmdBase):
         if isinstance(value, str):
             value = value.encode()
         client.setConfigKey(key, value)
-        print("Key:{}, value:{} stored".format(key, value))
+        print(f"Key:{key}, value:{value} stored")

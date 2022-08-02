@@ -30,7 +30,7 @@ class DecisionCli:
 
     @click.group()
     @click.pass_context
-    def decision(ctx):  # noqa: B902
+    def decision(self):    # noqa: B902
         """CLI tool to peek into Decision module."""
         pass
 
@@ -48,10 +48,10 @@ class PathCli:
     @click.option("--max-hop", default=256, help="max hop count")
     @click.option("--area", default=None, help="area identifier")
     @click.pass_obj
-    def path(cli_opts, src, dst, max_hop, area):  # noqa: B902
+    def path(self, src, dst, max_hop, area):    # noqa: B902
         """path from src to dst"""
 
-        decision.PathCmd(cli_opts).run(src, dst, max_hop, area)
+        decision.PathCmd(self).run(src, dst, max_hop, area)
 
 
 class DecisionRoutesComputedCli:
@@ -78,11 +78,11 @@ class DecisionRoutesComputedCli:
     )
     @click.option("--json/--no-json", default=False, help="Dump in JSON format")
     @click.pass_obj
-    def routes(cli_opts, nodes, prefixes, labels, json):  # noqa: B902
+    def routes(self, nodes, prefixes, labels, json):    # noqa: B902
         """Request the routing table from Decision module"""
 
-        nodes = parse_nodes(cli_opts, nodes)
-        decision.DecisionRoutesComputedCmd(cli_opts).run(nodes, prefixes, labels, json)
+        nodes = parse_nodes(self, nodes)
+        decision.DecisionRoutesComputedCmd(self).run(nodes, prefixes, labels, json)
 
 
 # TODO: Remove in a few months completely ...
@@ -104,14 +104,7 @@ class DecisionPrefixesCli:
     )
     @click.pass_obj
     @click.pass_context
-    def prefixes(
-        ctx: click.Context,  # noqa: B902
-        cli_opts: Any,
-        nodes: List[str],
-        json: bool,
-        prefix: str,
-        client_type: str,
-    ) -> None:
+    def prefixes(self, cli_opts: Any, nodes: List[str], json: bool, prefix: str, client_type: str) -> None:
         """show the prefixes from Decision module - Deprecated"""
 
         click.secho(
@@ -119,7 +112,7 @@ class DecisionPrefixesCli:
             bold=True,
             err=True,
         )
-        ctx.exit(1)
+        self.exit(1)
 
 
 class DecisionAdjCli:
@@ -142,11 +135,11 @@ class DecisionAdjCli:
     @click.option("--bidir/--no-bidir", default=True, help="Only bidir adjacencies")
     @click.option("--json/--no-json", default=False, help="Dump in JSON format")
     @click.pass_obj
-    def adj(cli_opts, nodes, areas, bidir, json):  # noqa: B902
+    def adj(self, nodes, areas, bidir, json):    # noqa: B902
         """dump the link-state adjacencies from Decision module"""
 
-        nodes = parse_nodes(cli_opts, nodes)
-        decision.DecisionAdjCmd(cli_opts).run(nodes, set(areas), bidir, json)
+        nodes = parse_nodes(self, nodes)
+        decision.DecisionAdjCmd(self).run(nodes, set(areas), bidir, json)
 
 
 class DecisionValidateCli:
@@ -155,12 +148,7 @@ class DecisionValidateCli:
     @click.argument("areas", nargs=-1)
     @click.pass_obj
     @click.pass_context
-    def validate(
-        ctx: click.Context,  # noqa: B902
-        cli_opts: bunch.Bunch,
-        json: bool,
-        areas: Sequence[str],
-    ) -> None:
+    def validate(self, cli_opts: bunch.Bunch, json: bool, areas: Sequence[str]) -> None:
         """
         Check all prefix & adj dbs in Decision against that in KvStore
 
@@ -191,18 +179,18 @@ class DecisionValidateCli:
             }
         """
 
-        ctx.exit(decision.DecisionValidateCmd(cli_opts).run(json, areas))
+        self.exit(decision.DecisionValidateCmd(cli_opts).run(json, areas))
 
 
 class DecisionRibPolicyCli:
     @click.command()
     @click.pass_obj
-    def show(cli_opts):  # noqa: B902
+    def show(self):    # noqa: B902
         """
         Show currently configured RibPolicy
         """
 
-        decision.DecisionRibPolicyCmd(cli_opts).run()
+        decision.DecisionRibPolicyCmd(self).run()
 
 
 class ReceivedRoutesCli:
@@ -222,18 +210,10 @@ class ReceivedRoutesCli:
     )
     @click.option("--json/--no-json", default=False, help="Output in JSON format")
     @click.pass_obj
-    def show(
-        cli_opts: bunch.Bunch,  # noqa: B902
-        prefix: List[str],
-        node: Optional[str],
-        area: Optional[str],
-        detail: bool,
-        tag2name: bool,
-        json: bool,
-    ) -> None:
+    def show(self, prefix: List[str], node: Optional[str], area: Optional[str], detail: bool, tag2name: bool, json: bool) -> None:
         """
         Show routes this node is advertising. Will show all by default
         """
-        decision.ReceivedRoutesCmd(cli_opts).run(
+        decision.ReceivedRoutesCmd(self).run(
             prefix, node, area, json, detail, tag2name
         )

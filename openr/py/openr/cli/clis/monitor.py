@@ -18,7 +18,7 @@ class MonitorCli(object):
 
     @click.group()
     @click.pass_context
-    def monitor(ctx):  # noqa: B902
+    def monitor(self):    # noqa: B902
         """CLI tool to peek into Monitor module."""
         pass
 
@@ -30,10 +30,10 @@ class CountersCli(object):
         "--prefix", default="", help="Only show counters starting with prefix"
     )
     @click.pass_obj
-    def counters(cli_opts, prefix, json):  # noqa: B902
+    def counters(self, prefix, json):    # noqa: B902
         """Fetch and display OpenR counters"""
 
-        monitor.CountersCmd(cli_opts).run(prefix, json)
+        monitor.CountersCmd(self).run(prefix, json)
 
 
 class MonitorLogs(object):
@@ -41,16 +41,16 @@ class MonitorLogs(object):
     @click.option("--prefix", default="", help="Show log events")
     @click.option("--json/--no-json", default=False, help="Dump in JSON format")
     @click.pass_obj
-    def logs(cli_opts, prefix, json):  # noqa: B902
+    def logs(self, prefix, json):    # noqa: B902
         """Print log events"""
 
-        monitor.LogCmd(cli_opts).run(json)
+        monitor.LogCmd(self).run(json)
 
 
 class MonitorStatistics(object):
     @click.command()
     @click.pass_obj
-    def statistics(cli_opts):  # noqa: B902
+    def statistics(self):    # noqa: B902
         """Print counters in pretty format"""
 
-        monitor.StatisticsCmd(cli_opts).run()
+        monitor.StatisticsCmd(self).run()

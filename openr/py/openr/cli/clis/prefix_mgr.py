@@ -23,7 +23,7 @@ class PrefixMgrCli:
 
     @click.group()
     @click.pass_context
-    def prefixmgr(ctx):  # noqa: B902
+    def prefixmgr(self):    # noqa: B902
         """CLI tool to peek into Prefix Manager module."""
         pass
 
@@ -38,12 +38,10 @@ class WithdrawCli(object):
         help="Type or client-ID associated with prefix.",
     )
     @click.pass_obj
-    def withdraw(
-        cli_opts: bunch.Bunch, prefixes: List[str], prefix_type: str  # noqa: B902
-    ):
+    def withdraw(self, prefixes: List[str], prefix_type: str):
         """Withdraw the prefixes being advertised from this node"""
 
-        prefix_mgr.WithdrawCmd(cli_opts).run(prefixes, prefix_type)
+        prefix_mgr.WithdrawCmd(self).run(prefixes, prefix_type)
 
 
 class AdvertiseCli(object):
@@ -61,10 +59,10 @@ class AdvertiseCli(object):
         help="Use label forwarding instead of IP forwarding in data path",
     )
     @click.pass_obj
-    def advertise(cli_opts, prefixes, prefix_type, forwarding_type):  # noqa: B902
+    def advertise(self, prefixes, prefix_type, forwarding_type):    # noqa: B902
         """Advertise the prefixes from this node with specific type"""
 
-        prefix_mgr.AdvertiseCmd(cli_opts).run(prefixes, prefix_type, forwarding_type)
+        prefix_mgr.AdvertiseCmd(self).run(prefixes, prefix_type, forwarding_type)
 
 
 class SyncCli(object):
@@ -82,10 +80,10 @@ class SyncCli(object):
         help="Use label forwarding instead of IP forwarding in data path",
     )
     @click.pass_obj
-    def sync(cli_opts, prefixes, prefix_type, forwarding_type):  # noqa: B902
+    def sync(self, prefixes, prefix_type, forwarding_type):    # noqa: B902
         """Sync the prefixes from this node with specific type"""
 
-        prefix_mgr.SyncCmd(cli_opts).run(prefixes, prefix_type, forwarding_type)
+        prefix_mgr.SyncCmd(self).run(prefixes, prefix_type, forwarding_type)
 
 
 class AdvertisedRoutesCli(object):
@@ -107,21 +105,15 @@ class AdvertisedRoutesCli(object):
     )
     @click.option("--json/--no-json", default=False, help="Output in JSON format")
     @click.pass_context
-    def show(
-        ctx: bunch.Bunch,  # noqa: B902
-        prefix_type: Optional[str],
-        detail: bool,
-        tag2name: bool,
-        json: bool,
-    ) -> None:
+    def show(self, prefix_type: Optional[str], detail: bool, tag2name: bool, json: bool) -> None:
         """
         Show advertised routes in various stages of policy
         """
 
         # Set options & arguments in cli_opts
-        if ctx.obj is None:
-            ctx.obj = bunch.Bunch()
-        ctx.obj["advertised_routes_options"] = bunch.Bunch(
+        if self.obj is None:
+            self.obj = bunch.Bunch()
+        self.obj["advertised_routes_options"] = bunch.Bunch(
             prefix_type=prefix_type,
             detail=detail,
             json=json,
@@ -131,14 +123,14 @@ class AdvertisedRoutesCli(object):
     @show.command("all")
     @click.argument("prefix", nargs=-1, type=str, required=False)
     @click.pass_obj
-    def all(cli_opts: bunch.Bunch, prefix: List[str]) -> None:  # noqa: B902
+    def all(self, prefix: List[str]) -> None:    # noqa: B902
         """
         Show routes that this node should be advertising across all areas. This
         is pre-area-policy routes. Note this does not show routes denied by origination policy
         """
 
-        opts = cli_opts.advertised_routes_options
-        prefix_mgr.AdvertisedRoutesCmd(cli_opts).run(
+        opts = self.advertised_routes_options
+        prefix_mgr.AdvertisedRoutesCmd(self).run(
             prefix, opts.prefix_type, opts.json, opts.detail
         )
 
@@ -146,16 +138,14 @@ class AdvertisedRoutesCli(object):
     @click.argument("area", type=str)
     @click.argument("prefix", nargs=-1, type=str, required=False)
     @click.pass_obj
-    def pre_area_policy(
-        cli_opts: bunch.Bunch, area: str, prefix: List[str]  # noqa: B902
-    ) -> None:
+    def pre_area_policy(self, area: str, prefix: List[str]) -> None:
         """
         Show pre-policy routes for advertisment of specified area
         but after applying origination, if applicable
         """
 
-        opts = cli_opts.advertised_routes_options
-        prefix_mgr.AreaAdvertisedRoutesCmd(cli_opts).run(
+        opts = self.advertised_routes_options
+        prefix_mgr.AreaAdvertisedRoutesCmd(self).run(
             area,
             ctrl_types.RouteFilterType.PREFILTER_ADVERTISED,
             prefix,
@@ -168,15 +158,13 @@ class AdvertisedRoutesCli(object):
     @click.argument("area", type=str)
     @click.argument("prefix", nargs=-1, type=str, required=False)
     @click.pass_obj
-    def post_area_policy(
-        cli_opts: bunch.Bunch, area: str, prefix: List[str]  # noqa: B902
-    ) -> None:
+    def post_area_policy(self, area: str, prefix: List[str]) -> None:
         """
         Show post-policy routes that are advertisment to specified area
         """
 
-        opts = cli_opts.advertised_routes_options
-        prefix_mgr.AreaAdvertisedRoutesCmd(cli_opts).run(
+        opts = self.advertised_routes_options
+        prefix_mgr.AreaAdvertisedRoutesCmd(self).run(
             area,
             ctrl_types.RouteFilterType.POSTFILTER_ADVERTISED,
             prefix,
@@ -189,15 +177,13 @@ class AdvertisedRoutesCli(object):
     @click.argument("area", type=str)
     @click.argument("prefix", nargs=-1, type=str, required=False)
     @click.pass_obj
-    def rejected_on_area(
-        cli_opts: bunch.Bunch, area: str, prefix: List[str]  # noqa: B902
-    ) -> None:
+    def rejected_on_area(self, area: str, prefix: List[str]) -> None:
         """
         Show routes rejected by area policy on advertisement
         """
 
-        opts = cli_opts.advertised_routes_options
-        prefix_mgr.AreaAdvertisedRoutesCmd(cli_opts).run(
+        opts = self.advertised_routes_options
+        prefix_mgr.AreaAdvertisedRoutesCmd(self).run(
             area,
             ctrl_types.RouteFilterType.REJECTED_ON_ADVERTISE,
             prefix,
@@ -210,9 +196,7 @@ class AdvertisedRoutesCli(object):
     @click.argument("area", type=str)
     @click.argument("prefix", nargs=-1, type=str, required=False)
     @click.pass_obj
-    def pre_policy(
-        cli_opts: bunch.Bunch, area: str, prefix: List[str]  # noqa: B902
-    ) -> None:
+    def pre_policy(self, area: str, prefix: List[str]) -> None:
         """
         DEPRECATED. use pre-area-policy
         """
@@ -222,9 +206,7 @@ class AdvertisedRoutesCli(object):
     @click.argument("area", type=str)
     @click.argument("prefix", nargs=-1, type=str, required=False)
     @click.pass_obj
-    def post_policy(
-        cli_opts: bunch.Bunch, area: str, prefix: List[str]  # noqa: B902
-    ) -> None:
+    def post_policy(self, area: str, prefix: List[str]) -> None:
         """
         DEPRECATED. use post-area-policy
         """
@@ -234,9 +216,7 @@ class AdvertisedRoutesCli(object):
     @click.argument("area", type=str)
     @click.argument("prefix", nargs=-1, type=str, required=False)
     @click.pass_obj
-    def rejected(
-        cli_opts: bunch.Bunch, area: str, prefix: List[str]  # noqa: B902
-    ) -> None:
+    def rejected(self, area: str, prefix: List[str]) -> None:
         """
         DEPRECATED. use rejected_on_area
         """
@@ -245,16 +225,14 @@ class AdvertisedRoutesCli(object):
     @show.command("pre-origination-policy")
     @click.argument("prefix", nargs=-1, type=str, required=False)
     @click.pass_obj
-    def pre_origination_policy(
-        cli_opts: bunch.Bunch, prefix: List[str]  # noqa: B902
-    ) -> None:
+    def pre_origination_policy(self, prefix: List[str]) -> None:
         """
         Show pre-origination-policy routes.
         Note: Only displays routes that came with an origination policy.
         """
 
-        opts = cli_opts.advertised_routes_options
-        prefix_mgr.AdvertisedRoutesWithOriginationPolicyCmd(cli_opts).run(
+        opts = self.advertised_routes_options
+        prefix_mgr.AdvertisedRoutesWithOriginationPolicyCmd(self).run(
             ctrl_types.RouteFilterType.PREFILTER_ADVERTISED,
             prefix,
             opts.prefix_type,
@@ -265,16 +243,14 @@ class AdvertisedRoutesCli(object):
     @show.command("post-origination-policy")
     @click.argument("prefix", nargs=-1, type=str, required=False)
     @click.pass_obj
-    def post_origination_policy(
-        cli_opts: bunch.Bunch, prefix: List[str]  # noqa: B902
-    ) -> None:
+    def post_origination_policy(self, prefix: List[str]) -> None:
         """
         Show post-policy routes that are accepted by origination policy. Only
         displays routes that came with an origination policy
         """
 
-        opts = cli_opts.advertised_routes_options
-        prefix_mgr.AdvertisedRoutesWithOriginationPolicyCmd(cli_opts).run(
+        opts = self.advertised_routes_options
+        prefix_mgr.AdvertisedRoutesWithOriginationPolicyCmd(self).run(
             ctrl_types.RouteFilterType.POSTFILTER_ADVERTISED,
             prefix,
             opts.prefix_type,
@@ -285,15 +261,13 @@ class AdvertisedRoutesCli(object):
     @show.command("rejected-on-origination")
     @click.argument("prefix", nargs=-1, type=str, required=False)
     @click.pass_obj
-    def rejected_on_origination(
-        cli_opts: bunch.Bunch, prefix: List[str]  # noqa: B902
-    ) -> None:
+    def rejected_on_origination(self, prefix: List[str]) -> None:
         """
         Show routes rejected by origination policy
         """
 
-        opts = cli_opts.advertised_routes_options
-        prefix_mgr.AdvertisedRoutesWithOriginationPolicyCmd(cli_opts).run(
+        opts = self.advertised_routes_options
+        prefix_mgr.AdvertisedRoutesWithOriginationPolicyCmd(self).run(
             ctrl_types.RouteFilterType.REJECTED_ON_ADVERTISE,
             prefix,
             opts.prefix_type,
@@ -315,13 +289,9 @@ class OriginatedRoutesCli(object):
         help="Translate tag string to human readable name",
     )
     @click.pass_obj
-    def show(
-        cli_opts: bunch.Bunch,  # noqa: B902
-        detail: bool,
-        tag2name: bool,
-    ) -> None:
+    def show(self, detail: bool, tag2name: bool) -> None:
         """
         Show originated routes configured on this node. Will show all by default
         """
 
-        prefix_mgr.OriginatedRoutesCmd(cli_opts).run(detail, tag2name)
+        prefix_mgr.OriginatedRoutesCmd(self).run(detail, tag2name)
